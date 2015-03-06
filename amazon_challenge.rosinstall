@@ -1,0 +1,3 @@
+- git: {local-name: cub, uri: 'https://github.com/NVlabs/cub.git', version: 1.3.2}
+- git: {local-name: simtrack, uri: 'git@bitbucket.org:karlpauwels/simtrack_private_devel', version: devel}
+- git: {local-name: amazon_challenge, uri: 'git@bitbucket.org:robocoffee/amazon_challenge', version: devel}
