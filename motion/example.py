@@ -8,11 +8,7 @@ pr2 = MyPR2()
 pr2.load('stack_campbells_on_pringles_dual_arm.pr2')
 
 # initialize
-torso = moveit_commander.MoveGroupCommander('torso')
-# initial torso pose was [0.011712079437378571]
-torso.set_joint_value_target([.03])
-torso.go()
-
+pr2.go_torso(.03)
 pr2.go_head('initial')
 pr2.go_left_arm('initial')
 pr2.go_right_arm('initial')

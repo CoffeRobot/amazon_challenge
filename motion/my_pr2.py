@@ -52,6 +52,7 @@ class MyPR2:
         self.r_gripper_pub = rospy.Publisher('/r_gripper_controller/gripper_action/goal', Pr2GripperCommandActionGoal)
         self.robot = moveit_commander.RobotCommander()
         self.scene = moveit_commander.PlanningSceneInterface()
+        self.torso = moveit_commander.MoveGroupCommander('torso')
         self.head = moveit_commander.MoveGroupCommander('head')
         self.arms = moveit_commander.MoveGroupCommander('arms')
         self.left_arm = moveit_commander.MoveGroupCommander('left_arm')
@@ -98,6 +99,12 @@ class MyPR2:
         """Store current right arm position
         """
         self.right_arm_dict[name] = self.right_arm.get_current_joint_values()
+
+    def go_torso(self, position):
+        """Move torso to position at max speed
+        """
+        self.torso.set_joint_value_target([position])
+        self.torso.go()
 
     def go_left_gripper(self, position, max_effort):
         """Move left gripper to position with max_effort
