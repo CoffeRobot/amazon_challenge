@@ -1,0 +1,48 @@
+<launch>
+<!--
+  replace the following values with yours:
+-->
+<!-- serial number of the Kinect, also specifies the names of the intrinsics calibration files -->
+<arg name="kinect_serial" value="head_mount" />  <!--B00366720055050B" /-->
+<!-- numerical values of the transfrom obtained in extrinsics calibration file -->
+<arg name="kinect_extrinsics_calib"
+      value="-0.025 0.000 0.005
+      	0.004 -0.011 0.002" /> <!-- Z X Y  -->
+<!--arg name="kinect_extrinsics_calib" values marten changed to see the effect
+      value="-0.0249325281128 -0.0025891359379 0.021378386249 
+      	0.0019740080697 -0.00410141663494 0.0038134913178" /-->
+
+<!--
+  OpenNI Kinect node
+-->
+<include file="$(find openni_launch)/launch/openni.launch">
+  <!-- intrinsics calibration files for both RGB and depth cameras -->
+  <arg name="rgb_camera_info_url" value="file:///home/pr2admin/karl_workspace/kinect_yasemin/camera_info/rgb_B00366720055050B.yaml" />
+  <arg name="depth_camera_info_url" value="file:///home/pr2admin/karl_workspace/kinect_yasemin/camera_info/depth_B00366720055050B.yaml" /> 
+  <arg name="camera" value="head_mount_kinect" />
+  <arg name="publish_tf" value="false" />
+  <arg name="depth_registration" value="false" /> <!--was false-->
+</include>
+
+<!--
+  TF transform publishers
+-->
+<group ns="$(arg kinect_serial)">
+  <arg name="pi/2" value="1.5707963267948966" />
+  <arg name="kinect_optical_rotate" value="0 0 0 -$(arg pi/2) 0 -$(arg pi/2)" />
+  <node pkg="tf" type="static_transform_publisher" name="kinect_calib_tf_broadcaster"
+        args="$(arg kinect_extrinsics_calib) /head_mount_kinect_rgb_optical_frame /head_mount_kinect_depth_optical_frame 100"/>
+
+  <!--node pkg="tf" type="static_transform_publisher" name="camera_base_link1"
+        args="0 0 0 0 0 0
+              /camera_link /head_mount_kinect_rgb_frame 100" />
+
+  <node pkg="tf" type="static_transform_publisher" name="camera_base_link3"
+        args="$(arg kinect_optical_rotate)
+              /head_mount_kinect_rgb_frame /head_mount_kinect_rgb_optical_frame 100" /-->
+
+  <node pkg="tf" type="static_transform_publisher" name="camera_base_link2"
+        args="0 0 0 $(arg pi/2) 0 $(arg pi/2)
+              /head_mount_kinect_depth_optical_frame /head_mount_kinect_depth_frame 100" />
+</group>
+</launch>

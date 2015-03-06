@@ -1,0 +1,27 @@
+<launch>
+
+  <!-- Bring up Kinect and processing nodelets -->
+  <include file="$(find openni_launch)/launch/openni.launch">
+    <!-- Set cam info URLs, if not in the default location -->
+    <!-- calib filess -->
+     <!--arg name="rgb_camera_info_url"
+          value="file://$(find long_term_memory)/long_term_memory/kinect/A00362A03213039A_manual_rgb.yaml" />
+     <arg name="depth_camera_info_url"
+          value="file://$(find long_term_memory)/long_term_memory/kinect/A00362A03213039A_manual_depth.yaml" /-->
+     <arg name="rgb_camera_info_url"
+          value="file:///home/yaseminb/.ros/camera_info/rgb_B00366720055050B.yaml" />
+     <arg name="depth_camera_info_url"
+          value="file:///home/yaseminb/.ros/camera_info/depth_B00366720055050B.yaml" />
+
+    <!-- Suppress the default tf transforms (Fuerte only) -->
+    <arg name="publish_tf" value="false" />
+  </include>
+
+  <node pkg="contrast" type="contrast_augmenter"
+        name="contrast_augmenter"  output="screen"/>
+
+  <!-- Extrinsic transform publisher -->
+  <include file="$(find camera_pose_calibration)/blocks/calibration_tf_publisher.launch">
+    <arg name="cache_file" value="/tmp/kinect_extrinsics_cache.bag" />
+  </include>
+</launch>
