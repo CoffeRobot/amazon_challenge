@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<package>
+  <name>vision</name>
+  <version>0.1.0</version>
+  <description>The vision package</description>
+  <maintainer email="kpauwels@todo.todo">kpauwels</maintainer>
+  <license>TODO</license>
+  <buildtool_depend>catkin</buildtool_depend>
+</package>

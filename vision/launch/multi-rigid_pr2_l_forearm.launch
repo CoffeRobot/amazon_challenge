@@ -1,0 +1,19 @@
+<launch>
+
+  <rosparam command="load" file="$(find vision)/config/demo_objects.yaml"/>
+
+  <rosparam command="load" file="$(find vision)/config/parameters.yaml"/>
+  <param name="simtrack/use_compressed_streams" value="true" />
+  <param name="simtrack/tracker/color_only_mode" value="true" />
+
+  <node name="tracker" pkg="simtrack_nodes" type="multi_rigid_tracker_node" output="screen">
+  <remap from="rgb/compressed" to="/l_forearm_cam/image_rect_color/compressed" />
+  <remap from="rgb_info" to="/l_forearm_cam/camera_info" />
+  </node>
+  
+  <node name="detector" pkg="simtrack_nodes" type="multi_rigid_detector_node" output="screen">
+  <remap from="rgb/compressed" to="/l_forearm_cam/image_rect_color/compressed" />
+  <remap from="rgb_info" to="/l_forearm_cam/camera_info" />
+  </node>
+  
+</launch>

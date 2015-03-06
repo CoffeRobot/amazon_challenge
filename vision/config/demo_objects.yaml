@@ -1,0 +1,5 @@
+simtrack/model_path: /home/karl/projects/ROS_tracker/private_devel/catkin_ws/src/simtrack/data/object_models
+simtrack/model_names:
+- ros_fuerte
+- ros_groovy
+- ros_hydro
