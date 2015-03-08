@@ -3,7 +3,6 @@ Amazon Challenge
 
 Code for the competition in Seattle
 
-
 Installation
 ------------
 
@@ -37,4 +36,54 @@ Build:
 ```
 cd ~/catkin_ws
 catkin_make
+```
+
+Simulation
+----------
+
+```
+roslaunch pr2_gazebo pr2_empty_world.launch
+roslaunch pr2_moveit_config move_group.launch
+```
+
+PR2
+---
+
+Start:
+```
+ssh pr2admin@pr2-c1
+robot claim
+robot start
+```
+
+Activate the Kinect with Yasemin's calibration:
+```
+cd ~/amazon_challenge_ws/
+roslaunch kinect_yasemin/kinect_node.launch
+```
+
+Start moveit:
+```
+cd ~/catkin_ws/
+source devel/setup.bash
+roslaunch pr2_ft_moveit_config move_group.launch
+```
+
+Stop:
+```
+robot stop
+robot release
+```
+
+Object tracking (e.g. on Aragorn):
+```
+export ROS_MASTER_URI=http://pr2-c1:11311
+roslaunch vision multi-rigid_pr2_head_mount_kinect.launch
+roslaunch vision multi-rigid_pr2_l_forearm.launch
+roslaunch vision multi-rigid_pr2_r_forearm.launch
+```
+
+To move the robot, look at [example.py](motion/example.py). It relies on [my_pr2.py](motion/my_pr2.py) which is available on the PR2 at:
+```
+~/amazon_challenge_ws/my_pr2.py
 ```
