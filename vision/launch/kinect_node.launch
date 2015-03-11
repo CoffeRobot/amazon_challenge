@@ -1,6 +1,6 @@
 <launch>
 <!--
-  replace the following values with yours:
+d  replace the following values with yours:
 -->
 <!-- serial number of the Kinect, also specifies the names of the intrinsics calibration files -->
 <arg name="kinect_serial" value="head_mount" />  <!--B00366720055050B" /-->
