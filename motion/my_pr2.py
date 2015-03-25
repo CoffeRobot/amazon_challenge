@@ -1,5 +1,5 @@
 import sys
-sys.path.append('/opt/ros/groovy/stacks/pr2_controllers/pr2_controllers_msgs/src')
+# sys.path.append('/opt/ros/groovy/stacks/pr2_controllers/pr2_controllers_msgs/src')
 import pickle
 import rospy
 import copy
@@ -8,6 +8,7 @@ from pr2_controllers_msgs.msg import Pr2GripperCommandActionGoal
 from moveit_msgs.msg import RobotTrajectory
 from trajectory_msgs.msg import JointTrajectoryPoint
 from geometry_msgs.msg import PoseStamped, Pose
+from geometry_msgs.msg import Twist
 
 
 def scale_trajectory_speed(traj, scale):
