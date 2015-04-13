@@ -10,6 +10,7 @@
 #include <pcl/visualization/cloud_viewer.h>
 #include <pcl/io/ply_io.h>
 #include <pcl/io/pcd_io.h>
+#include <pcl/io/obj_io.h>
 #include <iostream>
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
@@ -20,6 +21,7 @@
 #include <cstdlib>
 #include <tf_conversions/tf_eigen.h>
 #include <Eigen/Geometry>
+#include <pcl/common/common.h>
 
 using namespace pcl;
 using namespace std;
@@ -39,9 +41,9 @@ void alignShelf() {
   g_viewer->removePointCloud("estimated");
   Eigen::Matrix4f transform = Eigen::Matrix4f::Identity();
   // Define a translation of 2.5 meters on the x axis.
-  transform(2, 3) = g_x;
-  transform(0, 3) = g_y;
-  transform(1, 3) = g_z;
+  transform(0, 3) = g_x;
+  transform(1, 3) = g_y;
+  transform(2, 3) = g_z;
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr transformed_cloud(
       new pcl::PointCloud<pcl::PointXYZ>());
@@ -106,9 +108,9 @@ void showShelfModel() {
 
   Eigen::Matrix4f transform = Eigen::Matrix4f::Identity();
   // Define a translation of 2.5 meters on the x axis.
-  transform(0, 3) = g_y;
-  transform(1, 3) = g_z;
-  transform(2, 3) = g_x;
+  transform(0, 3) = g_x;
+  transform(1, 3) = g_y;
+  transform(2, 3) = g_z;
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr transformed_cloud(
       new pcl::PointCloud<pcl::PointXYZ>());
@@ -127,11 +129,13 @@ void showShelfModel() {
 void loadShelfModel() {
   string meshname =
       "/home/alessandro/catkin_ws/src/pr2_amazon_challenge_sim/kiva_pod/meshes/"
-      "pod_medres_alt.pcd";
+      "pod_medres_rot4.pcd";
 
   pcl::PCDReader pcd_reader;
-  PointCloud<PointXYZ> cloud;
+
+  PointCloud<PointXYZ> cloud, transformed;
   pcd_reader.read(meshname, cloud);
+
   g_model_cloud = cloud.makeShared();
 }
 
