@@ -42,14 +42,14 @@ class TaskManager:
     def receive_update(self,msg):
         value = msg.data
 
-        if len(self.task_list) < 1
+        if len(self.task_list) < 1:
             return
 
-        if value == TASK_COMPLETED:
+        if value == self.TASK_COMPLETED:
             self.task_list.pop(0)
-        elif value == TASK_CANCELLED:
+        elif value == self.TASK_CANCELLED:
             self.task_list.pop(0)
-        elif value == TASK_POSTPONED:
+        elif value == self.TASK_POSTPONED:
             task = self.task_list.pop(0)
             self.task_list.append(task)
 
@@ -89,6 +89,16 @@ class TaskManager:
 task_manager = TaskManager()
 task_manager.read_json_list('/home/alessandro/catkin_ws/src/amazon_challenge/data/example.json')
 task_manager.publish_next_task()
+
+
+text = '[aaaa,bbbb]'
+text = text.replace('[','')
+text = text.replace(']','')
+words = text.split(',')
+print(words[0])
+print(words[1])
+
+
 
 
 
