@@ -22,7 +22,7 @@ link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
 catkin_package(
-  INCLUDE_DIRS include
+#  INCLUDE_DIRS include
   DEPENDS cv_bridge image_transport pcl_ros roscpp tf
 )
 
