@@ -5,7 +5,7 @@
 
   <rosparam command="load" file="$(find vision)/config/parameters.yaml"/>
   <param name="simtrack/use_compressed_streams" value="true" />
-  <param name="simtrack/tracker/color_only_mode" value="false" />
+  <param name="simtrack/tracker/color_only_mode" value="true" />
 
   <node name="tracker" pkg="simtrack_nodes" type="multi_rigid_tracker_node" output="screen">
   <remap from="depth/compressedDepth" to="/head_mount_kinect/depth_registered/image_rect_raw/compressedDepth" />

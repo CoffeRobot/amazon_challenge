@@ -7,7 +7,7 @@ simtrack/optical_flow/consistent: true
 simtrack/optical_flow/cons_thres: 0.5
 simtrack/optical_flow/four_orientations: false
 
-simtrack/tracker/color_only_mode: false
+simtrack/tracker/color_only_mode: true
 simtrack/tracker/n_icp_outer_it: 3
 simtrack/tracker/n_icp_inner_it: 3
 simtrack/tracker/w_flow: 1.0
