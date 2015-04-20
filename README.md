@@ -83,15 +83,48 @@ robot stop
 robot release
 ```
 
+### Starting the Laser Tilt Controller
+
+Example service call:
+```
+rosservice call laser_tilt_controller/set_periodic_cmd '{ command: { header: { stamp: 0 }, profile: "linear" , period: 9 , amplitude: 1 , offset: 0 }}'
+```
+
+See [here](http://wiki.ros.org/pr2_mechanism_controllers/LaserScannerTrajController) for more details.
+
 ### Object Tracking 
 
 For example on Aragorn:
 ```
 export ROS_MASTER_URI=http://pr2-c1:11311
+```
+
+OBSOLETE: The old-style tracking cannot work with multiple cameras and is launched like this, depending on the camera:
+```
 roslaunch vision multi-rigid_pr2_head_mount_kinect.launch
 roslaunch vision multi-rigid_pr2_l_forearm.launch
 roslaunch vision multi-rigid_pr2_r_forearm.launch
 ```
+
+You should now use the camera switching node instead:
+```
+roslaunch vision pr2_cam_switch.launch
+```
+This node will initiate to the amazon_cheeze object but we'll remove this in the future. Instead the active objects need to be set with the following service call:
+```
+rosservice call /simtrack/tracker_switch_objects [amazon_crayon, amazon_notes]
+```
+It accepts a list of objects that should be kept minimal to conserve GPU memory. So this list should be updated before moving to the next bin. The tracker will crash if you misspell the object name.
+
+The camera can be selected with the following service call:
+```
+rosservice call /simtrack/tracker_switch_camera 0
+```
+The camera index can range from 0 to 2, as defined in [pr2_camera_topics.yaml](vision/launch/pr2_camera_topics.yaml):
+
+- 0: kinect
+- 1: left arm camera
+- 2: right arm camera
 
 ### Moving the Robot
 
