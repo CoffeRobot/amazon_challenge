@@ -3,8 +3,16 @@ Amazon Challenge
 
 Code for the competition in Seattle
 
-Installation
-------------
+# Contents
+
+- [Installation](#installation)
+- [Simulation](#simulation)
+- [PR2](#pr2)
+    - [Start and Stop](##start-and-stop)
+    - [Object Tracking](##object-tracking)
+    - [Moving the Robot](##moving-the-robot)
+
+## Installation
 
 Install wstool:
 ```
@@ -38,20 +46,20 @@ cd ~/catkin_ws
 catkin_make
 ```
 
-Simulation
-----------
+## Simulation
 
 ```
 roslaunch pr2_gazebo pr2_empty_world.launch
 roslaunch pr2_moveit_config move_group.launch
 ```
 
-PR2
----
+## PR2
+
+### Start and Stop
 
 Start:
 ```
-ssh pr2admin@pr2-c1
+ssh user@pr2-c1
 robot claim
 robot start
 ```
@@ -75,13 +83,17 @@ robot stop
 robot release
 ```
 
-Object tracking (e.g. on Aragorn):
+### Object Tracking 
+
+For example on Aragorn:
 ```
 export ROS_MASTER_URI=http://pr2-c1:11311
 roslaunch vision multi-rigid_pr2_head_mount_kinect.launch
 roslaunch vision multi-rigid_pr2_l_forearm.launch
 roslaunch vision multi-rigid_pr2_r_forearm.launch
 ```
+
+### Moving the Robot
 
 To move the robot, look at [example.py](motion/example.py). It relies on [my_pr2.py](motion/my_pr2.py) which is available on the PR2 at:
 ```
