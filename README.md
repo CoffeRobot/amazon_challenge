@@ -5,12 +5,12 @@ Code for the competition in Seattle
 
 # Contents
 
-- [Installation](#installation)
-- [Simulation](#simulation)
-- [PR2](#pr2)
-    - [Start and Stop](##start-and-stop)
-    - [Object Tracking](##object-tracking)
-    - [Moving the Robot](##moving-the-robot)
+- [Installation](#markdown-header-installation)
+- [Simulation](#markdown-header-simulation)
+- [PR2](#markdown-header-pr2)
+    - [Start and Stop](#markdown-header-start-and-stop)
+    - [Object Tracking](#markdown-header-object-tracking)
+    - [Moving the Robot](#markdown-header-moving-the-robot)
 
 ## Installation
 
