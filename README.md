@@ -8,9 +8,9 @@ Code for the competition in Seattle
 - [Installation](#markdown-header-installation)
 - [Simulation](#markdown-header-simulation)
 - [PR2](#markdown-header-pr2)
-    - [Start and Stop](##markdown-header-start-and-stop)
-    - [Object Tracking](##markdown-header-object-tracking)
-    - [Moving the Robot](##markdown-header-moving-the-robot)
+    - [Start and Stop](#markdown-header-start-and-stop)
+    - [Object Tracking](#markdown-header-object-tracking)
+    - [Moving the Robot](#markdown-header-moving-the-robot)
 
 ## Installation
 
