@@ -5,7 +5,7 @@ Code for the competition in Seattle
 
 # Contents
 
-- [Installation](#installation)
+- [Installation](#markdown-header-installation)
 - [Simulation](#simulation)
 - [PR2](#pr2)
     - [Start and Stop](##start-and-stop)
