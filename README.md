@@ -126,6 +126,11 @@ The camera index can range from 0 to 2, as defined in [pr2_camera_topics.yaml](v
 - 1: left arm camera
 - 2: right arm camera
 
+Each frame, the list of reliably tracked objects (according to the tracker) is published as a string list on the topic:
+```
+/simtrack/reliably_tracked_objects
+```
+
 ### Moving the Robot
 
 To move the robot, look at [example.py](motion/example.py). It relies on [my_pr2.py](motion/my_pr2.py) which is available on the PR2 at:
