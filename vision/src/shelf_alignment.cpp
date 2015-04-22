@@ -150,7 +150,7 @@ void pointCloudCallback(const sensor_msgs::PointCloud2::ConstPtr& msg) {
 
   pcl::fromROSMsg(out, *g_cloud);
 
-  cloud.header = pcl_conversions::toPCL(msg->header);
+  //cloud.header = pcl_conversions::toPCL(msg->header);
 
   ROS_INFO("Point cloud received!");
 
