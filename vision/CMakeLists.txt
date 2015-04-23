@@ -10,6 +10,7 @@ find_package(catkin REQUIRED COMPONENTS
   image_transport
   pcl_ros
   tf
+  laser_geometry
 )
 
 find_package(OpenCV 2.4.8 REQUIRED)
@@ -56,4 +57,14 @@ target_link_libraries(shelf_alignment
 )
 
 
-MESSAGE( STATUS "PCL INCLUDES:         " ${PCL_INCLUDE_DIRS} )
+add_executable(laser_scanner_listener
+    src/laser_scanner_listener.cpp
+)
+
+target_link_libraries(laser_scanner_listener
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBS}
+  ${PCL_LIBRARIES}
+)
+
+#MESSAGE( STATUS "PCL INCLUDES:         " ${PCL_INCLUDE_DIRS} )
