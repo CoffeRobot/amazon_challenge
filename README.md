@@ -112,7 +112,7 @@ roslaunch vision pr2_cam_switch.launch
 ```
 This node will initiate to the *cheezit_big_original* object but we'll remove this in the future. Instead the active objects need to be set with the following service call:
 ```
-rosservice call /simtrack/tracker_switch_objects [crayola_64_ct, mead_index_cards]
+rosservice call /simtrack/tracker_switch_objects [crayola_64_ct,mead_index_cards]
 ```
 It accepts a list of objects that should be kept minimal to conserve GPU memory. So this list should be updated before moving to the next bin. The tracker will crash if you misspell the object name.
 
