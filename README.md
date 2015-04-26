@@ -137,3 +137,12 @@ To move the robot, look at [example.py](motion/example.py). It relies on [my_pr2
 ```
 ~/amazon_challenge_ws/my_pr2.py
 ```
+
+### Publish Aggregated Cloud
+
+To create a cloud using the tilt scanner and the kinect these are the steps required:
+
+- 0: Start the tilt scanner controller
+- 1: Launch the laser assembler: roslaunch vision laser_assembler.launch
+- 2: Run the cloud aggregator: rosrun vision periodic_cloud_aggregator
+```
