@@ -68,6 +68,16 @@ target_link_libraries(laser_scanner_listener
   ${PCL_LIBRARIES}
 )
 
+add_executable(periodic_cloud_aggregator
+    src/periodic_cloud_aggregator.cpp
+)
+
+target_link_libraries(periodic_cloud_aggregator
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBS}
+  ${PCL_LIBRARIES}
+)
+
 #add_executable(cloud_publisher
 #    src/cloud_publisher.cpp)
 
