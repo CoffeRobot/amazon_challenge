@@ -34,9 +34,8 @@ namespace amazon_challenge {
 class PeriodicCloudPublisher {
 
  public:
-  PeriodicCloudPublisher(shared_ptr<pcl::visualization::PCLVisualizer> viewer)
+  PeriodicCloudPublisher()
       : m_nh(),
-        m_viewer(viewer),
         m_kinect_timeout_ms(1000),
         m_kinect_last_received(chrono::system_clock::now()) {
     m_pub = m_nh.advertise<sensor_msgs::PointCloud2>("periodic_cloud", 1);
@@ -58,14 +57,10 @@ class PeriodicCloudPublisher {
         unique_ptr<tf::TransformListener>(new tf::TransformListener());
   }
 
+  void buildPointCloudMessage() {
 
-  void buildPointCloudMessage()
-  {
-
-      if(m_camera_info_msg.width == 0)
-          return;
-      if(m_last_depth_msg->width == 0)
-          return;
+    if (m_camera_info_msg.width == 0) return;
+    if (m_last_depth_msg->width == 0) return;
 
     m_mutex.lock();
     image_geometry::PinholeCameraModel model;
@@ -73,7 +68,8 @@ class PeriodicCloudPublisher {
 
     sensor_msgs::PointCloud2::Ptr cloud_msg(new sensor_msgs::PointCloud2);
 
-    if (m_last_depth_msg->encoding == sensor_msgs::image_encodings::TYPE_16UC1) {
+    if (m_last_depth_msg->encoding ==
+        sensor_msgs::image_encodings::TYPE_16UC1) {
       depthToCloud<uint16_t>(m_last_depth_msg, model, *cloud_msg, 0.0);
     } else if (m_last_depth_msg->encoding ==
                sensor_msgs::image_encodings::TYPE_32FC1) {
@@ -83,31 +79,21 @@ class PeriodicCloudPublisher {
     m_mutex.unlock();
 
     sensor_msgs::PointCloud2 out;
-    pcl_ros::transformPointCloud("base_link", *cloud_msg, out,
-                                 *m_tf_listener);
-    m_viewer->removePointCloud("kinect");
+    pcl_ros::transformPointCloud("base_link", *cloud_msg, out, *m_tf_listener);
 
     pcl::fromROSMsg(out, m_kinect_cloud);
-
-    pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ>
-        single_color(m_kinect_cloud.makeShared(), 0, 255, 0);
-    m_viewer->addPointCloud<pcl::PointXYZ>(m_kinect_cloud.makeShared(),
-                                           single_color, "kinect");
-
   }
-
 
   void cameraInfoCallback(const sensor_msgs::CameraInfoConstPtr& rgb_info_msg) {
     stringstream ss;
 
     auto can_lock = m_mutex.try_lock();
 
-    if(!can_lock)
-        return;
-    else
-    {
-        m_camera_info_msg = *rgb_info_msg;
-        m_mutex.unlock();
+    if (!can_lock)
+      return;
+    else {
+      m_camera_info_msg = *rgb_info_msg;
+      m_mutex.unlock();
     }
   }
 
@@ -127,23 +113,12 @@ class PeriodicCloudPublisher {
     srv.request.end = e.current_real;
 
     // Make the service call
-    if (m_client.call(srv)) {
+    if (m_client.call(srv)) {  
 
       sensor_msgs::PointCloud2 msg = srv.response.cloud;
 
-      // ROS_INFO("Published Cloud with laser");
+      ROS_INFO("Tilt scanner cloud received");
       pcl::fromROSMsg(msg, m_laser_cloud);
-
-      m_viewer->removePointCloud("laser_cloud");
-      pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ>
-          single_color(m_laser_cloud.makeShared(), 0, 0, 255);
-      m_viewer->addPointCloud<pcl::PointXYZ>(m_laser_cloud.makeShared(),
-                                             single_color, "laser_cloud");
-
-      m_laser_end = chrono::system_clock::now();
-
-      auto ms = chrono::duration_cast<chrono::milliseconds>(
-          m_laser_end - m_laser_end).count();
 
       buildPointCloudMessage();
 
@@ -156,6 +131,8 @@ class PeriodicCloudPublisher {
       pcl::toROSMsg(out_cloud, out_msg);
       m_pub.publish(out_msg);
 
+      ROS_INFO("Aggregated cloud published");
+
       // pub_.publish(srv.response.cloud);
     } else {
       ROS_ERROR("Error making service call\n");
@@ -164,32 +141,21 @@ class PeriodicCloudPublisher {
 
   void depthCallback(const sensor_msgs::ImageConstPtr& depth_msg) {
 
-
     auto elapsed = chrono::duration_cast<chrono::milliseconds>(
         chrono::system_clock::now() - m_kinect_last_received).count();
 
     if (static_cast<float>(elapsed) < m_kinect_timeout_ms) return;
     m_kinect_last_received = chrono::system_clock::now();
 
-
-    ROS_INFO("Depth image received");
+    ROS_INFO("Kinect depth received");
 
     auto can_lock = m_mutex.try_lock();
 
-    if(can_lock)
-    {
-        m_last_depth_msg = depth_msg;
-        m_mutex.unlock();
-    }
-    else
-        return;
-
-
-
-
-
-
-
+    if (can_lock) {
+      m_last_depth_msg = depth_msg;
+      m_mutex.unlock();
+    } else
+      return;
   }
 
  private:
@@ -199,7 +165,6 @@ class PeriodicCloudPublisher {
   ros::Subscriber m_kinect_subscriber, m_camera_info_sub;
   ros::Timer m_timer;
   bool m_first_time;
-  shared_ptr<pcl::visualization::PCLVisualizer> m_viewer;
   unique_ptr<tf::TransformListener> m_tf_listener;
 
   chrono::time_point<chrono::system_clock> m_kinect_start, m_kinect_end,
@@ -213,35 +178,26 @@ class PeriodicCloudPublisher {
   sensor_msgs::CameraInfo m_camera_info_msg;
   sensor_msgs::ImageConstPtr m_last_depth_msg;
   std::mutex m_mutex;
-
-
 };
 
 }  // end namepace
 
 int main(int argc, char** argv) {
   ROS_INFO("Init viewer!");
-  shared_ptr<pcl::visualization::PCLVisualizer> viewer;
-  viewer = shared_ptr<pcl::visualization::PCLVisualizer>(
-      new pcl::visualization::PCLVisualizer("3D Viewer"));
-  viewer->setBackgroundColor(0, 0, 0);
-  viewer->addCoordinateSystem(1.0);
-  viewer->initCameraParameters();
 
   ROS_INFO("Init listener!");
   ros::init(argc, argv, "composite_cloud_builder");
   // ros::NodeHandle nh;
   // LaserScannerListener scanner_listener(nh, viewer);
 
-  amazon_challenge::PeriodicCloudPublisher laserPublisher(viewer);
+  amazon_challenge::PeriodicCloudPublisher aggregated_cloud_publisher;
 
-
-  ROS_INFO("Looping!");
-  while (!viewer->wasStopped()) {
-
+  while(ros::ok())
+  {
     ros::spinOnce();
-    viewer->spinOnce(1);
   }
+
+
 
   return 0;
 }
