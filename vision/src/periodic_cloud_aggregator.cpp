@@ -37,12 +37,12 @@ class PeriodicCloudPublisher {
   PeriodicCloudPublisher(shared_ptr<pcl::visualization::PCLVisualizer> viewer)
       : m_nh(),
         m_viewer(viewer),
-        m_kinect_timeout_ms(3000),
+        m_kinect_timeout_ms(1000),
         m_kinect_last_received(chrono::system_clock::now()) {
-    m_pub = m_nh.advertise<sensor_msgs::PointCloud>("periodic_cloud", 1);
+    m_pub = m_nh.advertise<sensor_msgs::PointCloud2>("periodic_cloud", 1);
 
-    // m_client =
-    //    m_nh.serviceClient<laser_assembler::AssembleScans2>("assemble_scans2");
+    m_client =
+        m_nh.serviceClient<laser_assembler::AssembleScans2>("assemble_scans2");
 
     m_timer = m_nh.createTimer(ros::Duration(5, 0),
                                &PeriodicCloudPublisher::laserCallback, this);
@@ -58,17 +58,56 @@ class PeriodicCloudPublisher {
         unique_ptr<tf::TransformListener>(new tf::TransformListener());
   }
 
+
+  void buildPointCloudMessage()
+  {
+
+      if(m_camera_info_msg.width == 0)
+          return;
+      if(m_last_depth_msg->width == 0)
+          return;
+
+    m_mutex.lock();
+    image_geometry::PinholeCameraModel model;
+    model.fromCameraInfo(m_camera_info_msg);
+
+    sensor_msgs::PointCloud2::Ptr cloud_msg(new sensor_msgs::PointCloud2);
+
+    if (m_last_depth_msg->encoding == sensor_msgs::image_encodings::TYPE_16UC1) {
+      depthToCloud<uint16_t>(m_last_depth_msg, model, *cloud_msg, 0.0);
+    } else if (m_last_depth_msg->encoding ==
+               sensor_msgs::image_encodings::TYPE_32FC1) {
+      depthToCloud<float>(m_last_depth_msg, model, *cloud_msg, 0.0);
+    }
+    cloud_msg->header.frame_id = m_camera_info_msg.header.frame_id;
+    m_mutex.unlock();
+
+    sensor_msgs::PointCloud2 out;
+    pcl_ros::transformPointCloud("base_link", *cloud_msg, out,
+                                 *m_tf_listener);
+    m_viewer->removePointCloud("kinect");
+
+    pcl::fromROSMsg(out, m_kinect_cloud);
+
+    pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ>
+        single_color(m_kinect_cloud.makeShared(), 0, 255, 0);
+    m_viewer->addPointCloud<pcl::PointXYZ>(m_kinect_cloud.makeShared(),
+                                           single_color, "kinect");
+
+  }
+
+
   void cameraInfoCallback(const sensor_msgs::CameraInfoConstPtr& rgb_info_msg) {
     stringstream ss;
 
-    auto can_lock = m_camera_mutex.try_lock();
+    auto can_lock = m_mutex.try_lock();
 
     if(!can_lock)
         return;
     else
     {
         m_camera_info_msg = *rgb_info_msg;
-        m_camera_mutex.unlock();
+        m_mutex.unlock();
     }
   }
 
@@ -91,14 +130,14 @@ class PeriodicCloudPublisher {
     if (m_client.call(srv)) {
 
       sensor_msgs::PointCloud2 msg = srv.response.cloud;
-      pcl::PointCloud<pcl::PointXYZ> pcl_cloud;
+
       // ROS_INFO("Published Cloud with laser");
-      pcl::fromROSMsg(msg, pcl_cloud);
+      pcl::fromROSMsg(msg, m_laser_cloud);
 
       m_viewer->removePointCloud("laser_cloud");
       pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ>
-          single_color(pcl_cloud.makeShared(), 255, 0, 0);
-      m_viewer->addPointCloud<pcl::PointXYZ>(pcl_cloud.makeShared(),
+          single_color(m_laser_cloud.makeShared(), 0, 0, 255);
+      m_viewer->addPointCloud<pcl::PointXYZ>(m_laser_cloud.makeShared(),
                                              single_color, "laser_cloud");
 
       m_laser_end = chrono::system_clock::now();
@@ -106,11 +145,16 @@ class PeriodicCloudPublisher {
       auto ms = chrono::duration_cast<chrono::milliseconds>(
           m_laser_end - m_laser_end).count();
 
-      stringstream ss;
-      ss << "Laser cloud with " << (uint32_t)(pcl_cloud.points.size()) << " in "
-         << static_cast<float>(ms) << " ms ";
+      buildPointCloudMessage();
 
-      ROS_INFO(ss.str().c_str());
+      pcl::PointCloud<pcl::PointXYZ> out_cloud;
+      out_cloud = m_laser_cloud;
+
+      out_cloud += m_kinect_cloud;
+
+      sensor_msgs::PointCloud2 out_msg;
+      pcl::toROSMsg(out_cloud, out_msg);
+      m_pub.publish(out_msg);
 
       // pub_.publish(srv.response.cloud);
     } else {
@@ -130,40 +174,17 @@ class PeriodicCloudPublisher {
 
     ROS_INFO("Depth image received");
 
-    m_camera_mutex.lock();
-    image_geometry::PinholeCameraModel model;
-    model.fromCameraInfo(m_camera_info_msg);
-    m_camera_mutex.unlock();
+    auto can_lock = m_mutex.try_lock();
 
-    sensor_msgs::PointCloud2::Ptr cloud_msg(new sensor_msgs::PointCloud2);
-
-    if (depth_msg->encoding == sensor_msgs::image_encodings::TYPE_16UC1) {
-      depthToCloud<uint16_t>(depth_msg, model, *cloud_msg, 0.0);
-    } else if (depth_msg->encoding ==
-               sensor_msgs::image_encodings::TYPE_32FC1) {
-      depthToCloud<float>(depth_msg, model, *cloud_msg, 0.0);
+    if(can_lock)
+    {
+        m_last_depth_msg = depth_msg;
+        m_mutex.unlock();
     }
+    else
+        return;
 
-    stringstream ss;
-    ss << "Depth image received: w " << depth_msg->width << " h "
-       << depth_msg->height << " frame_id " << depth_msg->header.frame_id
-       << " camera_info "  << m_camera_info_msg.header.frame_id  <<"\n";
 
-    ss << "Cloud message: " << cloud_msg->row_step* cloud_msg->height << "\n";
-    ROS_INFO(ss.str().c_str());
-    // setting frame id to transform image
-    cloud_msg->header.frame_id = m_camera_info_msg.header.frame_id;
-
-    sensor_msgs::PointCloud2 out;
-    pcl_ros::transformPointCloud("base_footprint", *cloud_msg, out,
-                                 *m_tf_listener);
-    m_viewer->removePointCloud("view");
-    pcl::PointCloud<pcl::PointXYZ> cloud;
-    pcl::fromROSMsg(*cloud_msg, cloud);
-    m_viewer->addPointCloud<pcl::PointXYZ>(cloud.makeShared(), "view");
-    stringstream ss1;
-    ss1 << "Size of image data: " << sizeof(cloud_msg->data);
-    ROS_INFO(ss1.str().c_str());
 
 
 
@@ -186,8 +207,12 @@ class PeriodicCloudPublisher {
   chrono::time_point<chrono::system_clock> m_kinect_last_received;
   float m_kinect_timeout_ms;
 
+  pcl::PointCloud<pcl::PointXYZ> m_kinect_cloud;
+  pcl::PointCloud<pcl::PointXYZ> m_laser_cloud;
+
   sensor_msgs::CameraInfo m_camera_info_msg;
-  std::mutex m_camera_mutex;
+  sensor_msgs::ImageConstPtr m_last_depth_msg;
+  std::mutex m_mutex;
 
 
 };
