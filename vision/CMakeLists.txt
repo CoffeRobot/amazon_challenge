@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_ros
   tf
   laser_geometry
+  image_geometry
 )
 
 find_package(OpenCV 2.4.8 REQUIRED)
@@ -23,8 +24,8 @@ link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
 catkin_package(
-#  INCLUDE_DIRS include
-  DEPENDS cv_bridge image_transport pcl_ros roscpp tf
+  INCLUDE_DIRS include
+  DEPENDS cv_bridge image_transport pcl_ros roscpp tf image_geometry
 )
 
 
@@ -66,5 +67,24 @@ target_link_libraries(laser_scanner_listener
   ${OpenCV_LIBS}
   ${PCL_LIBRARIES}
 )
+
+add_executable(periodic_cloud_aggregator
+    src/periodic_cloud_aggregator.cpp
+)
+
+target_link_libraries(periodic_cloud_aggregator
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBS}
+  ${PCL_LIBRARIES}
+)
+
+#add_executable(cloud_publisher
+#    src/cloud_publisher.cpp)
+
+#target_link_libraries(cloud_publisher
+#  ${catkin_LIBRARIES}
+#  ${OpenCV_LIBS}
+#  ${PCL_LIBRARIES}
+#)
 
 #MESSAGE( STATUS "PCL INCLUDES:         " ${PCL_INCLUDE_DIRS} )
