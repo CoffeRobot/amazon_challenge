@@ -78,6 +78,16 @@ target_link_libraries(periodic_cloud_aggregator
   ${PCL_LIBRARIES}
 )
 
+add_executable(object_segmentation
+    src/object_segmentation.cpp
+)
+
+target_link_libraries(object_segmentation
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBS}
+  ${PCL_LIBRARIES}
+)
+
 #add_executable(cloud_publisher
 #    src/cloud_publisher.cpp)
 
