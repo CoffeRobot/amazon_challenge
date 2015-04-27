@@ -37,7 +37,9 @@ class PeriodicCloudPublisher {
   PeriodicCloudPublisher()
       : m_nh(),
         m_kinect_timeout_ms(1000),
-        m_kinect_last_received(chrono::system_clock::now()) {
+        m_kinect_last_received(chrono::system_clock::now()),
+        m_first_dimage_received(false)
+  {
     m_pub = m_nh.advertise<sensor_msgs::PointCloud2>("periodic_cloud", 1);
 
     m_client =
@@ -75,7 +77,15 @@ class PeriodicCloudPublisher {
                sensor_msgs::image_encodings::TYPE_32FC1) {
       depthToCloud<float>(m_last_depth_msg, model, *cloud_msg, 0.0);
     }
-    cloud_msg->header.frame_id = m_camera_info_msg.header.frame_id;
+    else
+    {
+        ROS_WARN("Warning: unsupported depth image format!");
+        return;
+    }
+
+
+    //cloud_msg->header.frame_id = m_camera_info_msg.header.frame_id;
+    cloud_msg->header.frame_id = m_last_depth_msg->header.frame_id;
     m_mutex.unlock();
 
     sensor_msgs::PointCloud2 out;
@@ -118,7 +128,13 @@ class PeriodicCloudPublisher {
       sensor_msgs::PointCloud2 msg = srv.response.cloud;
 
       ROS_INFO("Tilt scanner cloud received");
+      if(!m_first_dimage_received)
+      {
+          ROS_INFO("Kinect depth not available yet");
+          return;
+      }
       pcl::fromROSMsg(msg, m_laser_cloud);
+
 
       buildPointCloudMessage();
 
@@ -153,6 +169,8 @@ class PeriodicCloudPublisher {
 
     if (can_lock) {
       m_last_depth_msg = depth_msg;
+      if(!m_first_dimage_received)
+          m_first_dimage_received = true;
       m_mutex.unlock();
     } else
       return;
@@ -165,6 +183,7 @@ class PeriodicCloudPublisher {
   ros::Subscriber m_kinect_subscriber, m_camera_info_sub;
   ros::Timer m_timer;
   bool m_first_time;
+  bool m_first_dimage_received;
   unique_ptr<tf::TransformListener> m_tf_listener;
 
   chrono::time_point<chrono::system_clock> m_kinect_start, m_kinect_end,
@@ -192,9 +211,11 @@ int main(int argc, char** argv) {
 
   amazon_challenge::PeriodicCloudPublisher aggregated_cloud_publisher;
 
+  ros::Rate r(100);
   while(ros::ok())
   {
     ros::spinOnce();
+    r.sleep();
   }
 
 
