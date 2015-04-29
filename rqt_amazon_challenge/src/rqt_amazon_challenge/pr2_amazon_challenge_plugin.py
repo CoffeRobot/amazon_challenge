@@ -125,7 +125,7 @@ class PR2AmazonChallengePlugin(Plugin):
         self._widget.base_calibration_button.clicked[bool].connect(self._handle_base_col_1_pos_button_clicked)
         self._widget.base_col_1_pos_button.clicked[bool].connect(self._handle_base_col_1_pos_button_clicked)
         self._widget.base_col_2_pos_button.clicked[bool].connect(self._handle_base_col_2_pos_button_clicked)
-        self._widget.base_col_2_pos_button.clicked[bool].connect(self._handle_base_col_3_pos_button_clicked)
+        self._widget.base_col_3_pos_button.clicked[bool].connect(self._handle_base_col_3_pos_button_clicked)
 
         self._widget.arms_start_pos_button.clicked[bool].connect(self._handle_arms_start_pos_button_clicked)
 
@@ -283,7 +283,7 @@ class PR2AmazonChallengePlugin(Plugin):
         self._torso.go()
 
     def _handle_arms_start_pos_button_clicked(self):
-        rospy.loginfo('[GUI]: arms row 4 pos')
+        rospy.loginfo('[GUI]: arms start pos')
         left_arm_joint_pos_dict = rospy.get_param('/left_arm_joint_pos_dict')
         right_arm_joint_pos_dict = rospy.get_param('/right_arm_joint_pos_dict')
         left_arm_joint_pos_goal = left_arm_joint_pos_dict['start']
