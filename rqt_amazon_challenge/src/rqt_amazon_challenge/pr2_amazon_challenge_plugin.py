@@ -96,7 +96,7 @@ class PR2AmazonChallengePlugin(Plugin):
                 pass
 
 
-        self._bm = baseMove.baseMove(verbose=True)
+        self._bm = baseMove.baseMove(verbose=False)
         self._bm.setPosTolerance(0.02)
         self._bm.setAngTolerance(0.006)
         self._bm.setLinearGain(1)
@@ -283,7 +283,7 @@ class PR2AmazonChallengePlugin(Plugin):
         self._torso.go()
 
     def _handle_arms_start_pos_button_clicked(self):
-        rospy.loginfo('[GUI]: torso row 4 pos')
+        rospy.loginfo('[GUI]: arms row 4 pos')
         left_arm_joint_pos_dict = rospy.get_param('/left_arm_joint_pos_dict')
         right_arm_joint_pos_dict = rospy.get_param('/right_arm_joint_pos_dict')
         left_arm_joint_pos_goal = left_arm_joint_pos_dict['start']
