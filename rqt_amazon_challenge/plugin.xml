@@ -1,0 +1,11 @@
+<library path="src">
+  <class name="PR2AmazonChallengePlugin" type="rqt_amazon_challenge.pr2_amazon_challenge_plugin.PR2AmazonChallengePlugin" base_class_type="rqt_gui_py::Plugin">
+    <description>
+      A Python GUI plugin for the PR2 in the Amazon Picking Challenge
+    </description>
+    <qtgui>
+      <label>PR2 Amazon Challenge GUI</label>
+      <statustip>A Python GUI plugin for the PR2 in the Amazon Picking Challenge.</statustip>
+    </qtgui>
+  </class>
+</library>
