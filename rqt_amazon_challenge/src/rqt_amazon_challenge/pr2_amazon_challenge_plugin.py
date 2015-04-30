@@ -99,7 +99,7 @@ class PR2AmazonChallengePlugin(Plugin):
         self._bm = baseMove.baseMove(verbose=False)
         self._bm.setPosTolerance(0.02)
         self._bm.setAngTolerance(0.006)
-        self._bm.setLinearGain(1)
+        self._bm.setLinearGain(0.4)
         self._bm.setAngularGain(1)
 
         # button click callbacks
@@ -300,6 +300,10 @@ class PR2AmazonChallengePlugin(Plugin):
         base_pos_dict = rospy.get_param('/base_pos_dict')
 
         base_pos_goal = base_pos_dict['column_1']
+
+        rospy.loginfo('Base setpoint: ')
+        rospy.loginfo(base_pos_goal)
+
         self._bm.goAngle(base_pos_goal[5])
         self._bm.goPosition(base_pos_goal[0:2])
         self._bm.goAngle(base_pos_goal[5])
@@ -311,6 +315,10 @@ class PR2AmazonChallengePlugin(Plugin):
         base_pos_dict = rospy.get_param('/base_pos_dict')
 
         base_pos_goal = base_pos_dict['column_2']
+
+        rospy.loginfo('Base setpoint: ')
+        rospy.loginfo(base_pos_goal)
+
         self._bm.goAngle(base_pos_goal[5])
         self._bm.goPosition(base_pos_goal[0:2])
         self._bm.goAngle(base_pos_goal[5])
@@ -322,6 +330,10 @@ class PR2AmazonChallengePlugin(Plugin):
         base_pos_dict = rospy.get_param('/base_pos_dict')
 
         base_pos_goal = base_pos_dict['column_3']
+
+        rospy.loginfo('Base setpoint: ')
+        rospy.loginfo(base_pos_goal)
+
         self._bm.goAngle(base_pos_goal[5])
         self._bm.goPosition(base_pos_goal[0:2])
         self._bm.goAngle(base_pos_goal[5])
