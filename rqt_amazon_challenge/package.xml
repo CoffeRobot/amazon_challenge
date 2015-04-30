@@ -1,0 +1,25 @@
+<package>
+  <name>rqt_amazon_challenge</name>
+  <version>0.0.0</version>
+  <description>GUI for amazon challenge.</description>
+  <maintainer email="fevb@kth.se">Francisco Vina</maintainer>
+
+  <license>BSD</license>
+
+  <url type="website">https://bitbucket.org/cvapgoestoseattle/amazon_challenge</url>
+  <url type="repository">https://bitbucket.org/cvapgoestoseattle/amazon_challenge</url>
+  <url type="bugtracker">https://bitbucket.org/cvapgoestoseattle/amazon_challenge/issues</url>
+
+  <author>Francisco Vina</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <run_depend>rospy</run_depend>
+  <run_depend>rqt_gui</run_depend>
+  <run_depend>rqt_gui_py</run_depend>
+  <run_depend>rqt_py_common</run_depend>
+
+  <export>
+    <rqt_gui plugin="${prefix}/plugin.xml"/>
+  </export>
+</package>
