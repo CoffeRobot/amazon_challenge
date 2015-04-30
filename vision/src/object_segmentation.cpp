@@ -4,6 +4,8 @@
 #include <string>
 #include <tf/transform_listener.h>
 #include <tf_conversions/tf_eigen.h>
+#include <sensor_msgs/PointCloud2.h>
+#include <vision/ReceiveCloud.h>
 
 
 using namespace std;
@@ -20,8 +22,17 @@ public:
         m_nh()
     {
         m_marker_publisher = m_nh.advertise<visualization_msgs::Marker>("segmentation_marker", 10);
+        m_service_server = m_nh.advertiseService("receive_point_cloud", &CloudSegmenter::receivePointCloud, this);
+
     };
 
+
+    bool receivePointCloud(vision::ReceiveCloud::Request &req,
+                           vision::ReceiveCloud::Response &res)
+    {
+        ROS_INFO("Seg Server: Cloud received!");
+        return true;
+    }
 
     void publishMarkers()
     {
@@ -74,6 +85,7 @@ private:
 
     ros::NodeHandle m_nh;
     ros::Publisher m_marker_publisher;
+    ros::ServiceServer m_service_server;
     tf::TransformListener m_tf_listener;
     visualization_msgs::Marker m_shelf_marker;
 

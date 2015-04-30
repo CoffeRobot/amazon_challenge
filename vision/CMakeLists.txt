@@ -23,9 +23,32 @@ include_directories(${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
+## Generate actions in the 'action' folder
+add_action_files(
+  DIRECTORY action
+  FILES BT.action
+)
+
+add_service_files(
+  DIRECTORY srv
+  FILES ReceiveCloud.srv
+)
+
+generate_messages(
+  DEPENDENCIES actionlib_msgs std_msgs  sensor_msgs# Or other packages containing msgs
+)
+
 catkin_package(
   INCLUDE_DIRS include
-  DEPENDS cv_bridge image_transport pcl_ros roscpp tf image_geometry
+  DEPENDS cv_bridge
+          image_transport
+          pcl_ros
+          roscpp
+          tf
+          image_geometry
+          actionlib
+          actionlib_msgs
+          message_generation
 )
 
 
@@ -45,7 +68,9 @@ include_directories(include
   ${PCL_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
   ${EIGEN_INCLUDE_DIR} 
+  ${PROJECT_SOURCE_DIR}../../amazon_challenge_bt/
 )
+
 
 add_executable(shelf_alignment
   src/shelf_alignment.cpp
@@ -77,6 +102,31 @@ target_link_libraries(periodic_cloud_aggregator
   ${OpenCV_LIBS}
   ${PCL_LIBRARIES}
 )
+
+add_dependencies(
+ periodic_cloud_aggregator
+  ${amazon_challenge_bt_actions_EXPORTED_TARGETS}
+  ${PROJECT_NAME}_generate_messages_cpp
+)
+
+add_executable(periodic_cloud_test_client
+    src/periodic_cloud_test_client.cpp
+)
+
+target_link_libraries(periodic_cloud_test_client
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBS}
+  ${PCL_LIBRARIES}
+)
+
+add_dependencies(
+ periodic_cloud_test_client
+  ${amazon_challenge_bt_actions_EXPORTED_TARGETS}
+  ${PROJECT_NAME}_generate_messages_cpp
+)
+
+
+
 
 add_executable(object_segmentation
     src/object_segmentation.cpp
