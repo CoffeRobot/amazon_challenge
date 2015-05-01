@@ -35,6 +35,7 @@
 #include <laser_assembler/AssembleScans2.h>
 #include <vision/ReceiveCloud.h>
 #include <simtrack_nodes/UpdateValidationPointCloud.h>
+#include <pr2_msgs/SetPeriodicCmd.h>
 
 using namespace std;
 
@@ -93,9 +94,11 @@ class PeriodicCloudPublisher {
 
     m_segmentation_client = m_nh.serviceClient<vision::ReceiveCloud>("receive_point_cloud");
     m_tracking_client = m_nh.serviceClient<simtrack_nodes::UpdateValidationPointCloud>("simtrack/update_validation_point_cloud");
-
+    m_pr2_laser_client = m_nh.serviceClient<pr2_msgs::SetPeriodicCmd>("laser_tilt_controller/set_periodic_cmd");
     // init action server
     m_action_server.start();
+
+    stopTiltScanner();
   }
   // returns the status to the client (Behavior Tree)
   void setStatus(int status) {
@@ -126,6 +129,7 @@ class PeriodicCloudPublisher {
     ROS_INFO("Starting Action");
     m_build_aggregated_cloud = true;
     m_cloud_req_time = chrono::system_clock::now();
+    startTiltScanner();
 
     // start executing the action
     while (!m_aggregated_cloud_ready) {
@@ -150,6 +154,7 @@ class PeriodicCloudPublisher {
     notifyTracker(out_msg);
     m_aggregated_cloud_ready = false;
     m_build_aggregated_cloud = false;
+    stopTiltScanner();
     // publish clouds for debugging purposes
     //m_publisher.publish(out_msg);
     //m_shelf_publisher.publish(shelf_msg);
@@ -190,6 +195,37 @@ class PeriodicCloudPublisher {
     {
         ROS_ERROR("Tracking node not listening");
     }
+  }
+
+  void stopTiltScanner()
+  {
+    pr2_msgs::SetPeriodicCmd srv;
+    srv.request.command.period = 0;
+    srv.request.command.profile = "linear";
+    srv.request.command.amplitude = 0;
+    srv.request.command.offset = 0;
+    srv.request.command.header.stamp = ros::Time::now();
+
+
+    if(!m_pr2_laser_client.call(srv))
+    {
+      ROS_ERROR("PCA: cannot stop pr2 tilt");
+    }
+  }
+
+  void startTiltScanner()
+  {
+      pr2_msgs::SetPeriodicCmd srv;
+      srv.request.command.period = 30;
+      srv.request.command.profile = "linear";
+      srv.request.command.amplitude = 1;
+      srv.request.command.offset = 0;
+      srv.request.command.header.stamp = ros::Time::now();
+
+      if(!m_pr2_laser_client.call(srv))
+      {
+        ROS_ERROR("PCA: cannot start pr2 tilt");
+      }
   }
 
   void buildPointCloudMessage() {
@@ -597,7 +633,7 @@ class PeriodicCloudPublisher {
   }*/
 
   ros::Publisher m_publisher, m_shelf_publisher, m_bin_publisher;
-  ros::ServiceClient m_client, m_segmentation_client, m_tracking_client;
+  ros::ServiceClient m_client, m_segmentation_client, m_tracking_client, m_pr2_laser_client;
   ros::Subscriber m_kinect_subscriber, m_camera_info_sub, m_taskmanager_sub;
   ros::Timer m_timer;
   bool m_first_time;
