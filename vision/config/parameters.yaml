@@ -25,3 +25,14 @@ simtrack/tracker/max_t_update_norm_squared: 0.04
 
 simtrack/detector/vec_size: 4
 simtrack/detector/num_iter_ransac: 1000
+
+simtrack/scene/include_shelf: true
+
+# every point in the validation point with error smaller than max_error (as compared to the predicted point cloud) is included in the validation count
+simtrack/validation/max_depth_error: 0.05
+
+# minimum proportion of the predicted object segment with depth measurements available
+simtrack/validation/min_proportion_with_depth_measurements: 0.20
+
+# minimum proportion of the correct depth measurements in predicted object segment (with regard to  all depth measurements in object segment)
+simtrack/validation/min_proportion_correct: 0.60
