@@ -29,10 +29,12 @@
 #include <vision/BTAction.h>
 #include <atomic>
 #include <thread>
+#include <visualization_msgs/Marker.h>
 
 // Services
 #include <laser_assembler/AssembleScans2.h>
 #include <vision/ReceiveCloud.h>
+#include <simtrack_nodes/UpdateValidationPointCloud.h>
 
 using namespace std;
 
@@ -44,18 +46,24 @@ enum Status {
   FAILURE
 };
 
+
+
 class PeriodicCloudPublisher {
 
  public:
   PeriodicCloudPublisher()
       : m_nh(),
         m_kinect_timeout_ms(4000),
+        m_min_aggregated_cloud_time(8000.0),
         m_kinect_last_received(chrono::system_clock::now()),
         m_first_dimage_received(false),
         m_action_server(m_nh, "periodic_cloud_aggregator",
                         boost::bind(&PeriodicCloudPublisher::executeCB, this, _1),false),
         m_action_name("periodic_cloud_aggregator"),
-        m_build_aggregated_cloud(false) {
+        m_build_aggregated_cloud(false),
+        m_bin_cloud(new pcl::PointCloud<pcl::PointXYZ>),
+        m_shelf_cloud(new pcl::PointCloud<pcl::PointXYZ>)
+  {
     m_publisher = m_nh.advertise<sensor_msgs::PointCloud2>("periodic_cloud", 1);
     m_shelf_publisher =
         m_nh.advertise<sensor_msgs::PointCloud2>("periodic_cloud_shelf", 1);
@@ -80,7 +88,11 @@ class PeriodicCloudPublisher {
     m_tf_listener =
         unique_ptr<tf::TransformListener>(new tf::TransformListener());
 
+    m_shelf_marker_pub =  m_nh.advertise<visualization_msgs::Marker>("shelf_marker", 10);
+    m_bin_marker_pub = m_nh.advertise<visualization_msgs::Marker>("bin_marker", 10);
+
     m_segmentation_client = m_nh.serviceClient<vision::ReceiveCloud>("receive_point_cloud");
+    m_tracking_client = m_nh.serviceClient<simtrack_nodes::UpdateValidationPointCloud>("simtrack/update_validation_point_cloud");
 
     // init action server
     m_action_server.start();
@@ -113,50 +125,35 @@ class PeriodicCloudPublisher {
     // publish info to the console for the user
     ROS_INFO("Starting Action");
     m_build_aggregated_cloud = true;
+    m_cloud_req_time = chrono::system_clock::now();
 
     // start executing the action
     while (!m_aggregated_cloud_ready) {
       // check that preempt has not been requested by the client
       if (m_action_server.isPreemptRequested() || !ros::ok()) {
         ROS_INFO("Action Halted");
-
-        /*
-                   HERE THE CODE TO EXECUTE WHEN THE  BEHAVIOR TREE DOES HALT
-           THE ACTION
-       */
-
         // set the action state to preempted
         m_action_server.setPreempted();
         //success = false;
         break;
       }
-
-      //ROS_INFO("Building aggregated cloud..");
-      /*
-                HERE THE CODE TO EXECUTE AS LONG AS THE BEHAVIOR TREE DOES NOT
-         HALT THE ACTION
-      */
-
-      // waiting the laser scanner and the kinect to return the point cloud
-      // while()
-      //{
-      // wait
-      //  std::this_thread::sleep_for (std::chrono::milliseconds(100));
-      //}
-      // If the action succeeded
-
-      // If the action Failed
-      // setStatus(FAILURE);
     }
-    // building the cloud
+    // building the clouds
     ROS_INFO("Aggregated cloud built");
-    sensor_msgs::PointCloud2 out_msg;
+    sensor_msgs::PointCloud2 out_msg, shelf_msg, bin_msg;
     pcl::toROSMsg(m_aggregated_cloud, out_msg);
-    m_publisher.publish(out_msg);
+    pcl::toROSMsg(*m_bin_cloud, bin_msg);
+    pcl::toROSMsg(*m_shelf_cloud, shelf_msg);
+
     // notify segmentation and tracking
-    notifySegmentation(out_msg);
+    notifySegmentation(bin_msg);
+    notifyTracker(out_msg);
     m_aggregated_cloud_ready = false;
     m_build_aggregated_cloud = false;
+    // publish clouds for debugging purposes
+    //m_publisher.publish(out_msg);
+    //m_shelf_publisher.publish(shelf_msg);
+    //m_bin_publisher.publish(bin_msg);
     // communicate success to the bt
     setStatus(SUCCESS);
   }
@@ -170,8 +167,29 @@ class PeriodicCloudPublisher {
       {
         bool result = srv.response.result;
         if(result)
-            ROS_INFO("Segmentation notified");
+            ROS_INFO("Segmentation node notified");
       }
+      else
+      {
+          ROS_ERROR("Segmentation node not listening");
+      }
+  }
+
+
+  void notifyTracker(sensor_msgs::PointCloud2& cloud)
+  {
+    simtrack_nodes::UpdateValidationPointCloud srv;
+    srv.request.point_cloud = cloud;
+    if (m_tracking_client.call(srv))
+    {
+      bool result = srv.response.success;
+      if(result)
+          ROS_INFO("Tracking node notified");
+    }
+    else
+    {
+        ROS_ERROR("Tracking node not listening");
+    }
   }
 
   void buildPointCloudMessage() {
@@ -235,7 +253,7 @@ class PeriodicCloudPublisher {
     }
 
     if (!m_build_aggregated_cloud) {
-      ROS_INFO("Laser: Aggregated cloud not requested!");
+      //ROS_INFO("Laser: Aggregated cloud not requested!");
       return;
     }
 
@@ -247,34 +265,42 @@ class PeriodicCloudPublisher {
     // Make the service call
     if (m_client.call(srv)) {
 
-      sensor_msgs::PointCloud2 msg = srv.response.cloud;
 
-      ROS_INFO("Tilt scanner cloud received");
-      if (!m_first_dimage_received) {
-        ROS_INFO("Kinect depth not available yet");
-        return;
+      auto elapsed = chrono::duration_cast<chrono::milliseconds>(
+            chrono::system_clock::now() - m_cloud_req_time).count();
+
+      if(elapsed > m_min_aggregated_cloud_time)
+      {
+          sensor_msgs::PointCloud2 msg = srv.response.cloud;
+
+          if (!m_first_dimage_received) {
+            //ROS_INFO("Kinect depth not available yet");
+            return;
+          }
+          pcl::PointCloud<pcl::PointXYZ> laser_cloud;
+          pcl::fromROSMsg(msg, laser_cloud);
+
+          // ROS_INFO("Before cloud message");
+
+          buildPointCloudMessage();
+
+          // ROS_INFO("After cloud message");
+          m_aggregated_cloud = laser_cloud;
+          m_aggregated_cloud += m_kinect_cloud;
+
+          createCloudBin(m_aggregated_cloud);
+          CreateCloudShelf(m_aggregated_cloud);
+
+
+          m_aggregated_cloud_ready = true;
+          stringstream ss;
+          ss << "Aggregated cloud built with points: " << m_aggregated_cloud.points.size();
+          ROS_INFO(ss.str().c_str());
       }
-      pcl::PointCloud<pcl::PointXYZ> laser_cloud;
-      pcl::fromROSMsg(msg, laser_cloud);
-
-      // ROS_INFO("Before cloud message");
-
-      buildPointCloudMessage();
-
-      // ROS_INFO("After cloud message");
-      m_aggregated_cloud = laser_cloud;
-      m_aggregated_cloud += m_kinect_cloud;
-      m_aggregated_cloud_ready = true;
-
-      // publishCloudShelf(out_cloud);
-      // publishCloudBin(out_cloud);
-
-      // sensor_msgs::PointCloud2 out_msg;
-      // pcl::toROSMsg(out_cloud, out_msg);
-      // m_publisher.publish(out_msg);
-
-      // ROS_INFO("Aggregated cloud published");
-
+      else
+      {
+          // do nothing, must wait for the next laser scan service to return
+      }
     } else {
       ROS_ERROR("Error making service call\n");
     }
@@ -283,7 +309,7 @@ class PeriodicCloudPublisher {
   void depthCallback(const sensor_msgs::ImageConstPtr& depth_msg) {
 
     if (!m_build_aggregated_cloud) {
-      ROS_INFO("Kinect: Aggregated cloud not requested!");
+      //ROS_INFO("Kinect: Aggregated cloud not requested!");
       return;
     }
 
@@ -323,8 +349,127 @@ class PeriodicCloudPublisher {
     m_mutex.unlock();
   }
 
+  /*void publishShelfMarkers()
+  {
+      string target_frame = "base_footprint";
+      string dest_frame = "shelf_frame";
+      tf::StampedTransform transform;
+      try {
+        m_tf_listener->lookupTransform(target_frame, dest_frame, ros::Time(0),
+                                       transform);
+      }
+      catch (tf::TransformException& ex) {
+        ROS_ERROR("Error in shelf publish of type %s", ex.what());
+        return;
+      }
+      auto origin = transform.getOrigin();
+      visualization_msgs::Marker shelf_marker;
+      getShelfMarker(shelf_marker);
+      shelf_marker.header.frame_id = target_frame;
+      shelf_marker.pose.position.x += origin.x();
+      shelf_marker.pose.position.y += origin.y();
+      shelf_marker.pose.position.z += origin.z();
+
+      m_shelf_marker_pub.publish(shelf_marker);
+  }*/
+
+  /*void publishCurrentBinMarkers()
+  {
+
+      string target_frame = "base_footprint";
+      string dest_frame = "shelf_" + m_bin_name;
+      tf::StampedTransform transform;
+      try {
+        m_tf_listener->lookupTransform(target_frame, dest_frame, ros::Time(0),
+                                       transform);
+      }
+      catch (tf::TransformException& ex) {
+        ROS_ERROR("Error in shelf publish of type %s", ex.what());
+        return;
+      }
+      auto origin = transform.getOrigin();
+      visualization_msgs::Marker marker;
+      marker.header.frame_id = target_frame;
+
+      marker.header.stamp = ros::Time::now();
+      marker.type = visualization_msgs::Marker::CUBE;
+      marker.ns = "bin";
+      marker.id = 1;
+      marker.action = visualization_msgs::Marker::ADD;
+
+      marker.pose.orientation.x = 0.0;
+      marker.pose.orientation.y = 0.0;
+      marker.pose.orientation.z = 0.0;
+      marker.pose.orientation.w = 1.0;
+
+      marker.color.r = 0.0f;
+      marker.color.g = 1.0f;
+      marker.color.b = 0.0f;
+      marker.color.a = 0.3;
+
+      marker.lifetime = ros::Duration();
+
+    if(m_bin_name.compare("bin_A") == 0 || m_bin_name.compare("bin_B") == 0 ||
+       m_bin_name.compare("bin_C") == 0 || m_bin_name.compare("bin_J") == 0 ||
+       m_bin_name.compare("bin_K") == 0 || m_bin_name.compare("bin_L") == 0)
+    {
+        marker.pose.position.x = origin.x() -0.01;
+        marker.pose.position.y = origin.y() -0.03;
+        marker.pose.position.z = origin.z() -0.04;
+        marker.scale.x = 0.44;
+        marker.scale.y = 0.31;
+        marker.scale.z = 0.32;
+        ROS_INFO("Big bin");
+
+    }
+    else if(m_bin_name.compare("bin_D") == 0 || m_bin_name.compare("bin_E") == 0 ||
+            m_bin_name.compare("bin_F") == 0 || m_bin_name.compare("bin_G") == 0 ||
+            m_bin_name.compare("bin_H") == 0 || m_bin_name.compare("bin_I") == 0)
+    {
+        marker.pose.position.x = origin.x() -0.01;
+        marker.pose.position.y = origin.y() -0.03;
+        marker.pose.position.z = origin.z() -0.04;
+        marker.scale.x = 0.44;
+        marker.scale.y = 0.31;
+        marker.scale.z = 0.29;
+        ROS_INFO("Small bin");
+    }
+    m_bin_marker_pub.publish(marker);
+
+  }*/
+
+  void publishClouds()
+  {
+
+      sensor_msgs::PointCloud2 out_msg, bin_msg, shelf_msg;
+      pcl::toROSMsg(m_aggregated_cloud, out_msg);
+      pcl::toROSMsg(*m_bin_cloud, bin_msg);
+      pcl::toROSMsg(*m_shelf_cloud, shelf_msg);
+
+      // publish clouds for debugging purposes
+      m_publisher.publish(out_msg);
+      m_shelf_publisher.publish(shelf_msg);
+      m_bin_publisher.publish(bin_msg);
+  }
+
  private:
-  void publishCloudShelf(const pcl::PointCloud<pcl::PointXYZ>& cloud) {
+
+  bool getBinType(string bin_name)
+  {
+      if(m_bin_name.compare("bin_A") == 0 || m_bin_name.compare("bin_B") == 0 ||
+         m_bin_name.compare("bin_C") == 0 || m_bin_name.compare("bin_J") == 0 ||
+         m_bin_name.compare("bin_K") == 0 || m_bin_name.compare("bin_L") == 0)
+      {
+          return 0;
+
+      }
+      else
+      {
+          return 1;
+      }
+  }
+
+  void CreateCloudShelf(const pcl::PointCloud<pcl::PointXYZ>& cloud) {
     tf::StampedTransform transform;
     string target_frame = "base_footprint";
     string dest_frame = "shelf_frame";
@@ -337,41 +482,35 @@ class PeriodicCloudPublisher {
       ROS_ERROR("Error in shelf publish of type %s", ex.what());
       return;
     }
-
-    pcl::PointCloud<pcl::PointXYZ>::Ptr shelf_cloud(
-        new pcl::PointCloud<pcl::PointXYZ>);
+    auto origin = transform.getOrigin();
 
     pcl::PassThrough<pcl::PointXYZ> pass;
 
     pass.setInputCloud(cloud.makeShared());
-    auto origin = transform.getOrigin();
+
 
     auto min_x = origin.x();
     auto max_x = origin.x() + 0.50;
     pass.setFilterFieldName("x");
     pass.setFilterLimits(min_x, max_x);
-    pass.filter(*shelf_cloud);
+    pass.filter(*m_shelf_cloud);
 
     auto min_y = origin.y() - 0.50;
     auto max_y = origin.y() + 0.50;
-    pass.setInputCloud(shelf_cloud);
+    pass.setInputCloud(m_shelf_cloud);
     pass.setFilterFieldName("y");
     pass.setFilterLimits(min_y, max_y);
-    pass.filter(*shelf_cloud);
+    pass.filter(*m_shelf_cloud);
 
     auto min_z = origin.z();
     auto max_z = origin.z() + 2.0;
-    pass.setInputCloud(shelf_cloud);
+    pass.setInputCloud(m_shelf_cloud);
     pass.setFilterFieldName("z");
     pass.setFilterLimits(min_z, max_z);
-    pass.filter(*shelf_cloud);
-
-    sensor_msgs::PointCloud2 out_msg;
-    pcl::toROSMsg(*shelf_cloud, out_msg);
-    m_shelf_publisher.publish(out_msg);
+    pass.filter(*m_shelf_cloud);
   }
 
-  void publishCloudBin(const pcl::PointCloud<pcl::PointXYZ>& cloud) {
+  void createCloudBin(const pcl::PointCloud<pcl::PointXYZ>& cloud) {
     tf::StampedTransform transform;
     string target_frame = "base_footprint";
     m_mutex.lock();
@@ -386,42 +525,79 @@ class PeriodicCloudPublisher {
       ROS_ERROR("Erro in bin publish of type %s", ex.what());
       return;
     }
-
-    pcl::PointCloud<pcl::PointXYZ>::Ptr bin_cloud(
-        new pcl::PointCloud<pcl::PointXYZ>);
-
-    pcl::PassThrough<pcl::PointXYZ> pass;
-
-    pass.setInputCloud(cloud.makeShared());
     auto origin = transform.getOrigin();
 
-    auto min_x = origin.x();
-    auto max_x = origin.x() + 0.45;
+
+    float min_x, max_x, min_y, max_y, min_z, max_z;
+
+    if(getBinType(m_bin_name) == 0)
+    {
+        min_x = -0.01; max_x = 0.43;
+        min_y = -0.03; max_y = 0.28;
+        min_z = -0.04; max_z = 0.27;
+    }
+    else
+    {
+        min_x = -0.01; max_x = 0.43;
+        min_y = -0.03; max_y = 0.32;
+        min_z = -0.08; max_z = 0.24;
+    }
+    // cleaning the old cloud
+    m_bin_cloud->clear();
+
+    pcl::PassThrough<pcl::PointXYZ> pass;
+    pass.setInputCloud(cloud.makeShared());
+
+    auto min_range = origin.x() + min_x;
+    auto max_range = origin.x() + max_x;
     pass.setFilterFieldName("x");
-    pass.setFilterLimits(min_x, max_x);
-    pass.filter(*bin_cloud);
+    pass.setFilterLimits(min_range, max_range);
+    pass.filter(*m_bin_cloud);
 
-    auto min_y = origin.y() - 0.05;
-    auto max_y = origin.y() + 0.40;
-    pass.setInputCloud(bin_cloud);
+    min_range = origin.y() + min_y;
+    max_range = origin.y() + max_y;
+    pass.setInputCloud(m_bin_cloud);
     pass.setFilterFieldName("y");
-    pass.setFilterLimits(min_y, max_y);
-    pass.filter(*bin_cloud);
+    pass.setFilterLimits(min_range, max_range);
+    pass.filter(*m_bin_cloud);
 
-    auto min_z = origin.z() - 0.05;
-    auto max_z = origin.z() + 0.25;
-    pass.setInputCloud(bin_cloud);
+    min_range = origin.z() + min_z;
+    max_range = origin.z() + max_z;
+    pass.setInputCloud(m_bin_cloud);
     pass.setFilterFieldName("z");
-    pass.setFilterLimits(min_z, max_z);
-    pass.filter(*bin_cloud);
-
-    sensor_msgs::PointCloud2 out_msg;
-    pcl::toROSMsg(*bin_cloud, out_msg);
-    m_bin_publisher.publish(out_msg);
+    pass.setFilterLimits(min_range, max_range);
+    pass.filter(*m_bin_cloud);
   }
 
+  /*void getShelfMarker(visualization_msgs::Marker& marker)
+  {
+      marker.header.stamp = ros::Time::now();
+      marker.type = visualization_msgs::Marker::CUBE;
+      marker.ns = "shelf";
+      marker.id = 0;
+      marker.action = visualization_msgs::Marker::ADD;
+      marker.pose.position.x = 0.43;
+      marker.pose.position.y = 0;
+      marker.pose.position.z = 0.88;
+      marker.pose.orientation.x = 0.0;
+      marker.pose.orientation.y = 0.0;
+      marker.pose.orientation.z = 0.0;
+      marker.pose.orientation.w = 1.0;
+
+      marker.scale.x = 1.0;
+      marker.scale.y = 1.0;
+      marker.scale.z = 2.4;
+
+      marker.color.r = 1.0f;
+      marker.color.g = 1.0f;
+      marker.color.b = 1.0f;
+      marker.color.a = 0.1;
+
+      marker.lifetime = ros::Duration();
+  }*/
+
   ros::Publisher m_publisher, m_shelf_publisher, m_bin_publisher;
-  ros::ServiceClient m_client, m_segmentation_client;
+  ros::ServiceClient m_client, m_segmentation_client, m_tracking_client;
   ros::Subscriber m_kinect_subscriber, m_camera_info_sub, m_taskmanager_sub;
   ros::Timer m_timer;
   bool m_first_time;
@@ -432,6 +608,8 @@ class PeriodicCloudPublisher {
       m_laser_start, m_laser_end;
   chrono::time_point<chrono::system_clock> m_kinect_last_received;
   float m_kinect_timeout_ms;
+  chrono::time_point<chrono::system_clock> m_cloud_req_time;
+  float m_min_aggregated_cloud_time ;
 
   string m_bin_name;
   string m_obj_name;
@@ -439,12 +617,15 @@ class PeriodicCloudPublisher {
   ros::ServiceServer m_bin_cloud_server;
 
   pcl::PointCloud<pcl::PointXYZ> m_aggregated_cloud, m_kinect_cloud;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr m_bin_cloud, m_shelf_cloud;
 
   sensor_msgs::CameraInfo m_camera_info_msg;
   sensor_msgs::ImageConstPtr m_last_depth_msg;
   std::mutex m_mutex;
 
   std::atomic_bool m_build_aggregated_cloud, m_aggregated_cloud_ready;
+
+  ros::Publisher m_shelf_marker_pub, m_bin_marker_pub;
 
  protected:
   ros::NodeHandle m_nh;
@@ -468,7 +649,11 @@ int main(int argc, char** argv) {
 
   ros::Rate r(100);
   while (ros::ok()) {
+      aggregated_cloud_publisher.publishClouds();
+      //aggregated_cloud_publisher.publishShelfMarkers();
+      //aggregated_cloud_publisher.publishCurrentBinMarkers();
     ros::spinOnce();
+
     r.sleep();
   }
 

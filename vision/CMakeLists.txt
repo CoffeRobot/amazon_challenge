@@ -12,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf
   laser_geometry
   image_geometry
+  simtrack_nodes
 )
 
 find_package(OpenCV 2.4.8 REQUIRED)
