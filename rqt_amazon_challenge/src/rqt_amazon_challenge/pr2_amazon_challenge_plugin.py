@@ -89,6 +89,7 @@ class PR2AmazonChallengePlugin(Plugin):
                 self._right_arm = moveit_commander.MoveGroupCommander('right_arm')
                 self._arms = moveit_commander.MoveGroupCommander('arms')
                 self._torso = moveit_commander.MoveGroupCommander('torso')
+                self._head = moveit_commander.MoveGroupCommander('head')
                 self._arms_dict = {'left_arm': self._left_arm, 'right_arm': self._right_arm}
                 break
             except:
@@ -127,7 +128,20 @@ class PR2AmazonChallengePlugin(Plugin):
         self._widget.base_col_2_pos_button.clicked[bool].connect(self._handle_base_col_2_pos_button_clicked)
         self._widget.base_col_3_pos_button.clicked[bool].connect(self._handle_base_col_3_pos_button_clicked)
 
+        self._widget.head_start_pos_button.clicked[bool].connect(self._handle_head_row_1_pos_button_clicked)
+        self._widget.head_row_1_pos_button.clicked[bool].connect(self._handle_head_row_1_pos_button_clicked)
+        self._widget.head_row_2_pos_button.clicked[bool].connect(self._handle_head_row_2_pos_button_clicked)
+        self._widget.head_row_3_pos_button.clicked[bool].connect(self._handle_head_row_3_pos_button_clicked)
+        self._widget.head_row_4_pos_button.clicked[bool].connect(self._handle_head_row_4_pos_button_clicked)
+
+
         self._widget.arms_start_pos_button.clicked[bool].connect(self._handle_arms_start_pos_button_clicked)
+
+        self._widget.pc_perception_button.clicked[bool].connect(self._handle_pc_perception_button_clicked)
+        self._widget.detector_button.clicked[bool].connect(self._handle_detector_button_clicked)
+        self._widget.pregrasp_button.clicked[bool].connect(self._handle_pregrasp_button_clicked)
+
+        self._mode = 'pregrasp'
 
     @staticmethod
     def add_arguments(parser):
@@ -154,6 +168,22 @@ class PR2AmazonChallengePlugin(Plugin):
         # This will enable a setting button (gear icon) in each dock widget title bar
         # Usually used to open a modal configuration dialog
 
+
+    # mode callback
+    def _handle_pc_perception_button_clicked(self):
+        self._mode = 'point_cloud_perception'
+        rospy.loginfo('[GUI]: point_cloud_perception mode')
+
+    def _handle_detector_button_clicked(self):
+        self._mode = 'detector'
+        rospy.loginfo('[GUI]: detector mode')
+
+
+    def _handle_pregrasp_button_clicked(self):
+        self._mode = 'pregrasp'
+        rospy.loginfo('[GUI]: pregrasp mode')
+
+
     # left arm
 
     def _handle_l_arm_start_pos_button_clicked(self):
@@ -167,7 +197,7 @@ class PR2AmazonChallengePlugin(Plugin):
     def _handle_l_arm_row_1_pos_button_clicked(self):
         rospy.loginfo('[GUI]: left arm row 1 pos')
         left_arm_joint_pos_dict = rospy.get_param('/left_arm_joint_pos_dict')
-        joint_pos_goal = left_arm_joint_pos_dict['row_1']
+        joint_pos_goal = left_arm_joint_pos_dict[self._mode]['row_1']
 
         self._left_arm.set_joint_value_target(joint_pos_goal)
         self._left_arm.go()
@@ -175,7 +205,7 @@ class PR2AmazonChallengePlugin(Plugin):
     def _handle_l_arm_row_2_pos_button_clicked(self):
         rospy.loginfo('[GUI]: left arm row 2 pos')
         left_arm_joint_pos_dict = rospy.get_param('/left_arm_joint_pos_dict')
-        joint_pos_goal = left_arm_joint_pos_dict['row_2']
+        joint_pos_goal = left_arm_joint_pos_dict[self._mode]['row_2']
 
         self._left_arm.set_joint_value_target(joint_pos_goal)
         self._left_arm.go()
@@ -183,7 +213,7 @@ class PR2AmazonChallengePlugin(Plugin):
     def _handle_l_arm_row_3_pos_button_clicked(self):
         rospy.loginfo('[GUI]: left arm row 3 pos')
         left_arm_joint_pos_dict = rospy.get_param('/left_arm_joint_pos_dict')
-        joint_pos_goal = left_arm_joint_pos_dict['row_3']
+        joint_pos_goal = left_arm_joint_pos_dict[self._mode]['row_3']
 
         self._left_arm.set_joint_value_target(joint_pos_goal)
         self._left_arm.go()
@@ -191,7 +221,7 @@ class PR2AmazonChallengePlugin(Plugin):
     def _handle_l_arm_row_4_pos_button_clicked(self):
         rospy.loginfo('[GUI]: left arm row 4 pos')
         left_arm_joint_pos_dict = rospy.get_param('/left_arm_joint_pos_dict')
-        joint_pos_goal = left_arm_joint_pos_dict['row_4']
+        joint_pos_goal = left_arm_joint_pos_dict[self._mode]['row_4']
 
         self._left_arm.set_joint_value_target(joint_pos_goal)
         self._left_arm.go()
@@ -210,7 +240,7 @@ class PR2AmazonChallengePlugin(Plugin):
     def _handle_r_arm_row_1_pos_button_clicked(self):
         rospy.loginfo('[GUI]: right arm row 1 pos')
         right_arm_joint_pos_dict = rospy.get_param('/right_arm_joint_pos_dict')
-        joint_pos_goal = right_arm_joint_pos_dict['row_1']
+        joint_pos_goal = right_arm_joint_pos_dict[self._mode]['row_1']
 
         self._right_arm.set_joint_value_target(joint_pos_goal)
         self._right_arm.go()
@@ -218,7 +248,7 @@ class PR2AmazonChallengePlugin(Plugin):
     def _handle_r_arm_row_2_pos_button_clicked(self):
         rospy.loginfo('[GUI]: right arm row 2 pos')
         right_arm_joint_pos_dict = rospy.get_param('/right_arm_joint_pos_dict')
-        joint_pos_goal = right_arm_joint_pos_dict['row_2']
+        joint_pos_goal = right_arm_joint_pos_dict[self._mode]['row_2']
 
         self._right_arm.set_joint_value_target(joint_pos_goal)
         self._right_arm.go()
@@ -226,7 +256,7 @@ class PR2AmazonChallengePlugin(Plugin):
     def _handle_r_arm_row_3_pos_button_clicked(self):
         rospy.loginfo('[GUI]: right arm row 3 pos')
         right_arm_joint_pos_dict = rospy.get_param('/right_arm_joint_pos_dict')
-        joint_pos_goal = right_arm_joint_pos_dict['row_3']
+        joint_pos_goal = right_arm_joint_pos_dict[self._mode]['row_3']
 
         self._right_arm.set_joint_value_target(joint_pos_goal)
         self._right_arm.go()
@@ -234,7 +264,7 @@ class PR2AmazonChallengePlugin(Plugin):
     def _handle_r_arm_row_4_pos_button_clicked(self):
         rospy.loginfo('[GUI]: right arm row 4 pos')
         right_arm_joint_pos_dict = rospy.get_param('/right_arm_joint_pos_dict')
-        joint_pos_goal = right_arm_joint_pos_dict['row_4']
+        joint_pos_goal = right_arm_joint_pos_dict[self._mode]['row_4']
 
         self._right_arm.set_joint_value_target(joint_pos_goal)
         self._right_arm.go()
@@ -337,4 +367,43 @@ class PR2AmazonChallengePlugin(Plugin):
         self._bm.goAngle(base_pos_goal[5])
         self._bm.goPosition(base_pos_goal[0:2])
         self._bm.goAngle(base_pos_goal[5])
+
+    def _handle_head_row_1_pos_button_clicked(self):
+        rospy.loginfo('[GUI]: head row 1 pos')
+
+        head_joint_pos_dict = rospy.get_param('/head_joint_pos_dict')
+        head_pos_goal = head_joint_pos_dict['row_1']
+
+        self._head.set_joint_value_target(head_pos_goal)
+        self._head.go()
+
+    def _handle_head_row_2_pos_button_clicked(self):
+        rospy.loginfo('[GUI]: head row 2 pos')
+
+        head_joint_pos_dict = rospy.get_param('/head_joint_pos_dict')
+        head_pos_goal = head_joint_pos_dict['row_2']
+
+        self._head.set_joint_value_target(head_pos_goal)
+        self._head.go()
+
+    def _handle_head_row_3_pos_button_clicked(self):
+        rospy.loginfo('[GUI]: head row 3 pos')
+
+        head_joint_pos_dict = rospy.get_param('/head_joint_pos_dict')
+        head_pos_goal = head_joint_pos_dict['row_3']
+
+        self._head.set_joint_value_target(head_pos_goal)
+        self._head.go()
+
+    def _handle_head_row_4_pos_button_clicked(self):
+        rospy.loginfo('[GUI]: head row 4 pos')
+
+        head_joint_pos_dict = rospy.get_param('/head_joint_pos_dict')
+        head_pos_goal = head_joint_pos_dict['row_4']
+
+        self._head.set_joint_value_target(head_pos_goal)
+        self._head.go()
+
+
+
 
