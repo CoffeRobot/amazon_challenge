@@ -211,16 +211,17 @@ class PeriodicCloudPublisher {
   void stopTiltScanner() {
     vector<double> positions;
     positions.push_back(0);
+    positions.push_back(0);
     //= {(d_top / d_top_h), (d_bottom / d_bottom_h)};
-    auto durations = {ros::Duration(0)};
+    auto durations = {ros::Duration(0),ros::Duration(10)};
 
     pr2_msgs::SetLaserTrajCmd srv;
-    srv.request.command.header.stamp = ros::Time::now();
+    //srv.request.command.header.stamp = ros::Time::now();
     srv.request.command.profile = "linear";
     srv.request.command.position =positions;
     srv.request.command.time_from_start = durations;
-    srv.request.command.max_velocity  = 10;
-    srv.request.command.max_acceleration = 30;
+    srv.request.command.max_velocity  = 0;
+    srv.request.command.max_acceleration = 0;
 
     if (!m_pr2_laser_client.call(srv)) {
       ROS_ERROR("PCA: cannot stop pr2 tilt");
@@ -260,8 +261,8 @@ class PeriodicCloudPublisher {
     double stop = asin(d_bottom / d_bottom_h);
 
     vector<double> positions;
-    positions.push_back(-1);
-    positions.push_back(1);
+    positions.push_back(start);
+    positions.push_back(stop);
     //= {(d_top / d_top_h), (d_bottom / d_bottom_h)};
     auto durations = {ros::Duration(0),
                       ros::Duration(10)};
@@ -272,12 +273,12 @@ class PeriodicCloudPublisher {
 
 
     pr2_msgs::SetLaserTrajCmd srv;
-    srv.request.command.header.stamp = ros::Time::now();
-    srv.request.command.profile = "linear_blended";
+    //srv.request.command.header.stamp = ros::Time::now();
+    srv.request.command.profile = "linear";
     srv.request.command.position =positions;
     srv.request.command.time_from_start = durations;
-    srv.request.command.max_velocity  = -1;
-    srv.request.command.max_acceleration = -1;
+    srv.request.command.max_velocity  = 10;
+    srv.request.command.max_acceleration = 30;
 
     if(!m_pr2_laser_client.call(srv))
     {
