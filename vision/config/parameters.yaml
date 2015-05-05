@@ -29,7 +29,7 @@ simtrack/detector/num_iter_ransac: 1000
 simtrack/scene/include_shelf: true
 
 # every point in the validation point with error smaller than max_error (as compared to the predicted point cloud) is included in the validation count
-simtrack/validation/max_depth_error: 0.05
+simtrack/validation/max_depth_error: 0.1
 
 # minimum proportion of the predicted object segment with depth measurements available
 simtrack/validation/min_proportion_with_depth_measurements: 0.20

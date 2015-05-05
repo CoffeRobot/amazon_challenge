@@ -103,7 +103,7 @@ class PeriodicCloudPublisher {
     // init action server
     m_action_server.start();
 
-    //stopTiltScanner();
+    stopTiltScanner();
   }
   // returns the status to the client (Behavior Tree)
   void setStatus(int status) {
@@ -159,7 +159,7 @@ class PeriodicCloudPublisher {
     notifyTracker(out_msg);
     m_aggregated_cloud_ready = false;
     m_build_aggregated_cloud = false;
-    //stopTiltScanner();
+    stopTiltScanner();
     // publish clouds for debugging purposes
     // m_publisher.publish(out_msg);
     // m_shelf_publisher.publish(shelf_msg);
@@ -209,12 +209,18 @@ class PeriodicCloudPublisher {
   }
 
   void stopTiltScanner() {
-    pr2_msgs::SetPeriodicCmd srv;
-    srv.request.command.period = 0;
-    srv.request.command.profile = "linear";
-    srv.request.command.amplitude = 0;
-    srv.request.command.offset = 0;
+    vector<double> positions;
+    positions.push_back(0);
+    //= {(d_top / d_top_h), (d_bottom / d_bottom_h)};
+    auto durations = {ros::Duration(0)};
+
+    pr2_msgs::SetLaserTrajCmd srv;
     srv.request.command.header.stamp = ros::Time::now();
+    srv.request.command.profile = "linear";
+    srv.request.command.position =positions;
+    srv.request.command.time_from_start = durations;
+    srv.request.command.max_velocity  = 10;
+    srv.request.command.max_acceleration = 30;
 
     if (!m_pr2_laser_client.call(srv)) {
       ROS_ERROR("PCA: cannot stop pr2 tilt");
@@ -233,11 +239,14 @@ class PeriodicCloudPublisher {
 
     float z_shelf_laser = scanner_origin.z();
 
+    float bin_offset = 0.05;
+    float bin_size = 0.27;
+
     float bin_low_x = bin_origin.x();
-    float bin_low_z = bin_origin.z() - 0.10;
+    float bin_low_z = bin_origin.z() - bin_offset;
 
     float bin_up_x = bin_low_x;
-    float bin_up_z = bin_low_z + 0.33;
+    float bin_up_z = bin_low_z + bin_size + bin_offset + 0.05;
 
     float d_top = (bin_up_z - z_shelf_laser) * -1;
     float d_bottom = (bin_low_z - z_shelf_laser) * -1;
@@ -251,8 +260,8 @@ class PeriodicCloudPublisher {
     double stop = asin(d_bottom / d_bottom_h);
 
     vector<double> positions;
-    positions.push_back(start);
-    positions.push_back(stop);
+    positions.push_back(-1);
+    positions.push_back(1);
     //= {(d_top / d_top_h), (d_bottom / d_bottom_h)};
     auto durations = {ros::Duration(0),
                       ros::Duration(10)};
@@ -263,11 +272,12 @@ class PeriodicCloudPublisher {
 
 
     pr2_msgs::SetLaserTrajCmd srv;
-    srv.request.command.profile = "linear";
+    srv.request.command.header.stamp = ros::Time::now();
+    srv.request.command.profile = "linear_blended";
     srv.request.command.position =positions;
     srv.request.command.time_from_start = durations;
-    srv.request.command.max_velocity  = 10;
-    srv.request.command.max_acceleration = 30;
+    srv.request.command.max_velocity  = -1;
+    srv.request.command.max_acceleration = -1;
 
     if(!m_pr2_laser_client.call(srv))
     {
