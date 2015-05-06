@@ -2,6 +2,6 @@
   <node type="laser_scan_assembler" pkg="laser_assembler" name="tilt_scan_assembler">
     <remap from="scan" to="tilt_scan"/>
     <param name="max_scans" type="int" value="4000000" />
-    <param name="fixed_frame" type="string" value="base_link" />
+    <param name="fixed_frame" type="string" value="base_footprint" />
   </node>
 </launch>

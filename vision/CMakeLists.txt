@@ -127,13 +127,23 @@ add_dependencies(
 )
 
 
-
-
-add_executable(object_segmentation
+add_executable(object_segmentation_node
+    src/object_segmentation_node.cpp
     src/object_segmentation.cpp
 )
 
-target_link_libraries(object_segmentation
+target_link_libraries(object_segmentation_node
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBS}
+  ${PCL_LIBRARIES}
+)
+
+add_executable(segmentation_test_client
+    src/segmentation_test_client.cpp
+    src/object_segmentation.cpp
+)
+
+target_link_libraries(segmentation_test_client
   ${catkin_LIBRARIES}
   ${OpenCV_LIBS}
   ${PCL_LIBRARIES}

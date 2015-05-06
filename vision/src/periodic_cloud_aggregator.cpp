@@ -316,7 +316,7 @@ class PeriodicCloudPublisher {
     m_mutex.unlock();
 
     sensor_msgs::PointCloud2 out;
-    pcl_ros::transformPointCloud("base_link", *cloud_msg, out, *m_tf_listener);
+    pcl_ros::transformPointCloud("base_footprint", *cloud_msg, out, *m_tf_listener);
 
     pcl::fromROSMsg(out, m_kinect_cloud);
   }
@@ -334,6 +334,49 @@ class PeriodicCloudPublisher {
       m_mutex.unlock();
       // ROS_INFO("Mutex unlocked by camera");
     }
+  }
+
+  void labelCloud(pcl::PointCloud<pcl::PointXYZRGB>& cloud)
+  {
+      tf::Vector3 bin_origin;
+      if (getTransformOrigin("shelf_bin_A", bin_origin)) {
+        colorCloudWithBin("bin_A", bin_origin, cloud);
+        ROS_INFO("drawing A");
+      }
+      if (getTransformOrigin("shelf_bin_B", bin_origin)) {
+        colorCloudWithBin("bin_B", bin_origin, cloud);
+      }
+      if (getTransformOrigin("shelf_bin_C", bin_origin)) {
+        colorCloudWithBin("bin_C", bin_origin, cloud);
+      }
+      if (getTransformOrigin("shelf_bin_D", bin_origin)) {
+        colorCloudWithBin("bin_D", bin_origin, cloud);
+      }
+      if (getTransformOrigin("shelf_bin_E", bin_origin)) {
+        colorCloudWithBin("bin_E", bin_origin, cloud);
+      }
+      if (getTransformOrigin("shelf_bin_F", bin_origin)) {
+        colorCloudWithBin("bin_F", bin_origin, cloud);
+      }
+      if (getTransformOrigin("shelf_bin_G", bin_origin)) {
+        colorCloudWithBin("bin_G", bin_origin, cloud);
+      }
+      if (getTransformOrigin("shelf_bin_H", bin_origin)) {
+        colorCloudWithBin("bin_H", bin_origin, cloud);
+      }
+      if (getTransformOrigin("shelf_bin_I", bin_origin)) {
+        colorCloudWithBin("bin_I", bin_origin, cloud);
+      }
+      if (getTransformOrigin("shelf_bin_J", bin_origin)) {
+        colorCloudWithBin("bin_A", bin_origin, cloud);
+      }
+      if (getTransformOrigin("shelf_bin_K", bin_origin)) {
+        colorCloudWithBin("bin_A", bin_origin, cloud);
+      }
+      if (getTransformOrigin("shelf_bin_L", bin_origin)) {
+        colorCloudWithBin("bin_L", bin_origin, cloud);
+      }
+
   }
 
   void laserCallback(const ros::TimerEvent& e) {
@@ -379,6 +422,12 @@ class PeriodicCloudPublisher {
         // ROS_INFO("After cloud message");
         m_aggregated_cloud = laser_cloud;
         m_aggregated_cloud += m_kinect_cloud;
+
+
+        pcl::copyPointCloud(m_aggregated_cloud, m_colored_cloud);
+        labelCloud(m_colored_cloud);
+
+        //pcl::io::savePCDFileASCII ("test_pcd.pcd", m_colored_cloud);
 
         createCloudBin(m_aggregated_cloud);
         CreateCloudShelf(m_aggregated_cloud);
@@ -531,7 +580,7 @@ class PeriodicCloudPublisher {
   void publishClouds() {
 
     sensor_msgs::PointCloud2 out_msg, bin_msg, shelf_msg;
-    pcl::toROSMsg(m_aggregated_cloud, out_msg);
+    pcl::toROSMsg(m_colored_cloud, out_msg);
     pcl::toROSMsg(*m_bin_cloud, bin_msg);
     pcl::toROSMsg(*m_shelf_cloud, shelf_msg);
 
@@ -617,21 +666,15 @@ class PeriodicCloudPublisher {
 
     float min_x, max_x, min_y, max_y, min_z, max_z;
 
-    if (getBinType(m_bin_name) == 0) {
-      min_x = 0.00;
-      max_x = 0.42;
-      min_y = 0.00;
-      max_y = 0.26;
-      min_z = 0.00;
-      max_z = 0.22;
-    } else {
-      min_x = 0.02;
-      max_x = 0.42;
-      min_y = 0.02;
-      max_y = 0.26;
-      min_z = -0.04;
-      max_z = 0.14;
-    }
+    auto size = getBinSize(m_bin_name);
+    float filter_offset = 0.02;
+    min_x = 0.04;
+    min_y = 0.02;
+    min_z = 0.02;
+    max_x = size.x() - filter_offset;
+    max_y = size.y() - filter_offset;
+    max_z = size.z() - filter_offset;
+
     // cleaning the old cloud
     m_bin_cloud->clear();
 
@@ -709,6 +752,7 @@ class PeriodicCloudPublisher {
 
   pcl::PointCloud<pcl::PointXYZ> m_aggregated_cloud, m_kinect_cloud;
   pcl::PointCloud<pcl::PointXYZ>::Ptr m_bin_cloud, m_shelf_cloud;
+  pcl::PointCloud<pcl::PointXYZRGB> m_colored_cloud;
 
   sensor_msgs::CameraInfo m_camera_info_msg;
   sensor_msgs::ImageConstPtr m_last_depth_msg;
