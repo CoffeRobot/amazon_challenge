@@ -60,7 +60,10 @@ class CloudSegmenter {
     res.result = true;
     m_mutex.unlock();
     m_segmentation_request = true;
-    pcl::copyPointCloud(m_cloud, m_segment_cloud);
+    pcl::copyPointCloud(m_cloud, m_cloud_colour);
+
+
+    pcl::io::savePCDFileASCII ("test_pcd.pcd", m_cloud);
 
     return true;
   }
@@ -68,20 +71,48 @@ class CloudSegmenter {
   void segmentCloud() {
     if (m_cloud.points.size() == 0) return;
 
-    if(!m_segmentation_request) return;
+    if(m_segmentation_request)
+    {
+        pcl::PointCloud<pcl::PointXYZ> plane_cloud, filter_cloud;
+        // ROS_INFO("Plane segmentation");
+        //findBinPlane(m_cloud, plane_cloud, filter_cloud);
+        // ROS_INFO("Object segmentation");
+        vector<pcl::PointCloud<pcl::PointXYZ>> clusters;
+        clusterComponents(m_cloud, clusters);
 
-    pcl::PointCloud<pcl::PointXYZRGB> out;
-    // ROS_INFO("Plane segmentation");
-    findBinPlane(out);
-    // ROS_INFO("Object segmentation");
-    clusterComponents(out);
-    // ROS_INFO("Publish segmentation");
-    if (out.points.size() == 0) {
-      ROS_WARN("SEG: bin cloud is empty");
-    } else
-      publishSegmentation(out);
 
-    m_segmentation_request = false;
+        m_found_clusters = clusters;
+
+        stringstream ss;
+        ss << "SEG: num clusters found: " << m_found_clusters.size();
+        ROS_INFO(ss.str().c_str());
+
+        m_segmentation_request = false;
+    }
+
+  }
+
+  void publishMarkers()
+  {
+    default_random_engine rde;
+    uniform_int_distribution<int> distribution(0, 255);
+
+    for(auto i = 0; i < m_found_clusters.size(); i++)
+    {
+        stringstream ss;
+        ss << "c" << i;
+        visualization_msgs::Marker m = mark_cluster(m_found_clusters[i], ss.str(), i,
+                                                    distribution(rde),
+                                                    distribution(rde),
+                                                    distribution(rde));
+        m_marker_pub.publish(m);
+    }
+    if(m_found_clusters.size() > 0)
+    {
+        sensor_msgs::PointCloud2 cloud;
+        pcl::toROSMsg(m_found_clusters[0], cloud);
+        m_segmentation_pub.publish(cloud);
+    }
   }
 
  private:
@@ -91,10 +122,13 @@ class CloudSegmenter {
     m_segmentation_pub.publish(cloud);
   }
 
-  void findBinPlane(pcl::PointCloud<pcl::PointXYZRGB> &out_cloud) {
+  void findBinPlane(pcl::PointCloud<pcl::PointXYZ>& in_cloud,
+                    pcl::PointCloud<pcl::PointXYZ>& plane_cloud,
+                    pcl::PointCloud<pcl::PointXYZ>& filtered_cloud) {
+
     pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
     pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr = m_cloud.makeShared();
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr = in_cloud.makeShared();
     // Create the segmentation object
     pcl::SACSegmentation<pcl::PointXYZ> seg;
     // Optional
@@ -109,79 +143,84 @@ class CloudSegmenter {
     seg.setInputCloud(cloud_ptr);
     seg.segment(*inliers, *coefficients);
 
-    pcl::ExtractIndices<pcl::PointXYZ> extract;
-    extract.setInputCloud(cloud_ptr);
-    extract.setIndices(inliers);
-    extract.setNegative(false);
-    extract.filter(m_plane_cloud);
+    if(inliers->indices.size() > 0)
+    {
+        pcl::ExtractIndices<pcl::PointXYZ> extract;
+        extract.setInputCloud(cloud_ptr);
+        extract.setIndices(inliers);
+        extract.setNegative(false);
+        extract.filter(plane_cloud);
 
-    for (auto i = 0; i < inliers->indices.size(); ++i) {
-      pcl::PointXYZRGB p(0, 255, 0);
-      auto pt = m_cloud[inliers->indices[i]];
-      p.x = pt.x;
-      p.y = pt.y;
-      p.z = pt.z;
-      out_cloud.points.push_back(p);
+        extract.setInputCloud(cloud_ptr);
+        extract.setIndices(inliers);
+        extract.setNegative(true);
+        extract.filter(filtered_cloud);
+        ROS_INFO("SEG: plane found");
+    }
+    else
+    {
+        filtered_cloud = in_cloud;
+        ROS_INFO("SEG: no plane found");
+
     }
 
-    extract.setInputCloud(cloud_ptr);
-    extract.setIndices(inliers);
-    extract.setNegative(true);
-    extract.filter(m_filtered_cloud);
+
   }
 
-  void clusterComponents(pcl::PointCloud<pcl::PointXYZRGB> &out_cloud) {
+  void clusterComponents(pcl::PointCloud<pcl::PointXYZ> &in_cloud,
+                         vector<pcl::PointCloud<pcl::PointXYZ>>& clusters) {
     pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(
         new pcl::search::KdTree<pcl::PointXYZ>);
-    tree->setInputCloud(m_filtered_cloud.makeShared());
+    tree->setInputCloud(in_cloud.makeShared());
 
     std::vector<pcl::PointIndices> cluster_indices;
     pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
-    ec.setClusterTolerance(0.02);  // 2cm
+    ec.setClusterTolerance(0.005);  // 2cm
     ec.setMinClusterSize(100);
     ec.setMaxClusterSize(25000);
     ec.setSearchMethod(tree);
-    ec.setInputCloud(m_filtered_cloud.makeShared());
+    ec.setInputCloud(in_cloud.makeShared());
     ec.extract(cluster_indices);
 
-    default_random_engine rde;
-    uniform_int_distribution<int> distribution(0, 255);
+    //default_random_engine rde;
+    //uniform_int_distribution<int> distribution(0, 255);
 
-    m_found_clusters.clear();
-
-    pcl::copyPointCloud(m_filtered_cloud, out_cloud);
+    //pcl::copyPointCloud(m_cloud, out_cloud);
 
     for (auto it = cluster_indices.begin(); it != cluster_indices.end(); ++it) {
-      auto r = distribution(rde);
-      auto g = distribution(rde);
-      auto b = distribution(rde);
+      //auto r = distribution(rde);
+      //auto g = distribution(rde);
+      //auto b = distribution(rde);
 
       pcl::PointCloud<pcl::PointXYZ> tmp_cloud;
-      tmp_cloud.header = m_filtered_cloud.header;
+      tmp_cloud.header = in_cloud.header;
 
       for (auto pit = it->indices.begin(); pit != it->indices.end(); ++pit) {
 
-        out_cloud.points[*pit].r = r;
-        out_cloud.points[*pit].r = g;
-        out_cloud.points[*pit].r = b;
+        //out_cloud.points[*pit].r = r;
+        //out_cloud.points[*pit].r = g;
+        //out_cloud.points[*pit].r = b;
 
-        auto pt = out_cloud.points[*pit];
+        auto pt = in_cloud.points[*pit];
         pcl::PointXYZ p(pt.x, pt.y, pt.z);
 
         tmp_cloud.push_back(p);
       }
-      stringstream ss;
-      ss << "Cloud" << m_found_clusters.size();
 
-      visualization_msgs::Marker tmp_marker =
-          mark_cluster(tmp_cloud, ss.str(), m_found_clusters.size(), r, g, b);
-      m_marker_pub.publish(tmp_marker);
-      m_found_clusters.push_back(tmp_cloud);
+
+      //stringstream ss;
+      //ss << "Cloud" << m_found_clusters.size();
+      //visualization_msgs::Marker tmp_marker =
+      //    mark_cluster(tmp_cloud, ss.str(), m_found_clusters.size(), r, g, b);
+      //m_marker_pub.publish(tmp_marker);
+      clusters.push_back(tmp_cloud);
     }
-    // ROS_INFO(ss.str().c_str());
   }
 
-  void findOBB() {
+  void findClusterOBB(pcl::PointCloud<pcl::PointXYZ> &cloud_cluster,
+                      Eigen::Vector3f& position,
+                      Eigen::Quaternionf& rotation,
+                      float& w, float& h, float& d) {
     for (auto i = 0; i < m_found_clusters.size(); ++i) {
       pcl::PCA<pcl::PointXYZ> pca;
       pcl::PointCloud<pcl::PointXYZ> proj;
@@ -192,10 +231,10 @@ class CloudSegmenter {
       pcl::PointXYZ proj_min, proj_max;
       pcl::getMinMax3D(proj, proj_min, proj_max);
 
-      Eigen::Quaternionf quaternion = Eigen::Quaternionf(pca.getEigenVectors());
+      rotation = Eigen::Quaternionf(pca.getEigenVectors());
 
       Eigen::Vector4f t = pca.getMean();
-      Eigen::Vector3f translation = Eigen::Vector3f(t.x(), t.y(), t.z());
+      position = Eigen::Vector3f(t.x(), t.y(), t.z());
 
       float width = fabs(proj_max.x - proj_min.x);
       float height = fabs(proj_max.y - proj_min.y);
@@ -203,9 +242,10 @@ class CloudSegmenter {
     }
   }
 
+
   visualization_msgs::Marker mark_cluster(
       pcl::PointCloud<pcl::PointXYZ> &cloud_cluster, std::string ns, int id,
-      float r, float g, float b) {
+      int r, int g, int b) {
     Eigen::Vector4f centroid;
     Eigen::Vector4f min;
     Eigen::Vector4f max;
@@ -213,15 +253,33 @@ class CloudSegmenter {
     pcl::compute3DCentroid(cloud_cluster, centroid);
     pcl::getMinMax3D(cloud_cluster, min, max);
 
+    Eigen::Vector3f position;
+    Eigen::Quaternionf rotation;
+    float w, h, d;
+    findClusterOBB(cloud_cluster, position, rotation, w, h, d);
+
     uint32_t shape = visualization_msgs::Marker::CUBE;
     visualization_msgs::Marker marker;
-    marker.header.frame_id = cloud_cluster.header.frame_id;
+    marker.header.frame_id = "base_footprint";
     marker.header.stamp = ros::Time::now();
 
     marker.ns = ns;
     marker.id = id;
     marker.type = shape;
     marker.action = visualization_msgs::Marker::ADD;
+
+    //marker.pose.position.x = position.x();
+    //marker.pose.position.y = position.y();
+    //marker.pose.position.z = position.z();
+    //marker.pose.orientation.x = rotation.x();
+    //marker.pose.orientation.y = rotation.y();
+    //marker.pose.orientation.z = rotation.z();
+    //marker.pose.orientation.w = rotation.w();
+
+    marker.scale.x = w;
+    marker.scale.y = h;
+    marker.scale.z = d;
+
 
     marker.pose.position.x = centroid[0];
     marker.pose.position.y = centroid[1];
@@ -259,7 +317,7 @@ class CloudSegmenter {
 
   std::mutex m_mutex;
   pcl::PointCloud<pcl::PointXYZ> m_cloud, m_filtered_cloud, m_plane_cloud;
-  pcl::PointCloud<pcl::PointXYZRGB> m_segment_cloud;
+  pcl::PointCloud<pcl::PointXYZRGB> m_cloud_colour;
   vector<pcl::PointCloud<pcl::PointXYZ>> m_found_clusters;
   atomic_bool m_segmentation_request;
 
@@ -274,6 +332,7 @@ int main(int argc, char **argv) {
   ros::Rate r(100);
   while (ros::ok()) {
     cs.segmentCloud();
+    cs.publishMarkers();
     ros::spinOnce();
     r.sleep();
   }

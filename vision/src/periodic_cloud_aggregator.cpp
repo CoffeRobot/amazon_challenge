@@ -284,19 +284,6 @@ class PeriodicCloudPublisher {
     {
       ROS_ERROR("PCA: cannot start pr2 tilt");
     }
-
-    /*
-    pr2_msgs::SetPeriodicCmd srv;
-    srv.request.command.period = 30;
-    srv.request.command.profile = "linear";
-    srv.request.command.amplitude = 1;
-    srv.request.command.offset = 0;
-    srv.request.command.header.stamp = ros::Time::now();
-
-    if(!m_pr2_laser_client.call(srv))
-    {
-      ROS_ERROR("PCA: cannot start pr2 tilt");
-    }*/
   }
 
   void buildPointCloudMessage() {
@@ -391,7 +378,7 @@ class PeriodicCloudPublisher {
 
         // ROS_INFO("After cloud message");
         m_aggregated_cloud = laser_cloud;
-        //m_aggregated_cloud += m_kinect_cloud;
+        m_aggregated_cloud += m_kinect_cloud;
 
         createCloudBin(m_aggregated_cloud);
         CreateCloudShelf(m_aggregated_cloud);
@@ -476,7 +463,7 @@ class PeriodicCloudPublisher {
       m_shelf_marker_pub.publish(shelf_marker);
   }*/
 
-  /*void publishCurrentBinMarkers()
+  void publishCurrentBinMarkers()
   {
 
       string target_frame = "base_footprint";
@@ -522,27 +509,24 @@ class PeriodicCloudPublisher {
         marker.scale.x = 0.44;
         marker.scale.y = 0.31;
         marker.scale.z = 0.32;
-        ROS_INFO("Big bin");
+        //ROS_INFO("Big bin");
 
     }
-    else if(m_bin_name.compare("bin_D") == 0 || m_bin_name.compare("bin_E") == 0
-  ||
-            m_bin_name.compare("bin_F") == 0 || m_bin_name.compare("bin_G") == 0
-  ||
-            m_bin_name.compare("bin_H") == 0 || m_bin_name.compare("bin_I") ==
-  0)
+    else if(m_bin_name.compare("bin_D") == 0 || m_bin_name.compare("bin_E") == 0 ||
+            m_bin_name.compare("bin_F") == 0 || m_bin_name.compare("bin_G") == 0 ||
+            m_bin_name.compare("bin_H") == 0 || m_bin_name.compare("bin_I") == 0)
     {
-        marker.pose.position.x = origin.x() -0.01;
-        marker.pose.position.y = origin.y() -0.03;
-        marker.pose.position.z = origin.z() -0.04;
-        marker.scale.x = 0.44;
-        marker.scale.y = 0.31;
-        marker.scale.z = 0.29;
-        ROS_INFO("Small bin");
+        marker.pose.position.x = origin.x() + 0.21;
+        marker.pose.position.y = origin.y() + 0.14;
+        marker.pose.position.z = origin.z() + 0.11;
+        marker.scale.x = 0.42;
+        marker.scale.y = 0.28;
+        marker.scale.z = 0.22;
+        //ROS_INFO("Small bin");
     }
     m_bin_marker_pub.publish(marker);
 
-  }*/
+  }
 
   void publishClouds() {
 
@@ -555,6 +539,11 @@ class PeriodicCloudPublisher {
     m_publisher.publish(out_msg);
     m_shelf_publisher.publish(shelf_msg);
     m_bin_publisher.publish(bin_msg);
+  }
+
+  void publishMarkers()
+  {
+   publishCurrentBinMarkers();
   }
 
  private:
@@ -629,19 +618,19 @@ class PeriodicCloudPublisher {
     float min_x, max_x, min_y, max_y, min_z, max_z;
 
     if (getBinType(m_bin_name) == 0) {
-      min_x = -0.01;
-      max_x = 0.43;
-      min_y = -0.03;
-      max_y = 0.28;
-      min_z = -0.04;
-      max_z = 0.27;
+      min_x = 0.00;
+      max_x = 0.42;
+      min_y = 0.00;
+      max_y = 0.26;
+      min_z = 0.00;
+      max_z = 0.22;
     } else {
-      min_x = -0.01;
-      max_x = 0.43;
-      min_y = -0.03;
-      max_y = 0.32;
-      min_z = -0.08;
-      max_z = 0.24;
+      min_x = 0.02;
+      max_x = 0.42;
+      min_y = 0.02;
+      max_y = 0.26;
+      min_z = -0.04;
+      max_z = 0.14;
     }
     // cleaning the old cloud
     m_bin_cloud->clear();
@@ -662,11 +651,11 @@ class PeriodicCloudPublisher {
     pass.setFilterLimits(min_range, max_range);
     pass.filter(*m_bin_cloud);
 
-    min_range = origin.z() + min_z;
-    max_range = origin.z() + max_z;
+    float min_range_z = origin.z() + min_z;
+    float max_range_z = origin.z() + max_z;
     pass.setInputCloud(m_bin_cloud);
     pass.setFilterFieldName("z");
-    pass.setFilterLimits(min_range, max_range);
+    pass.setFilterLimits(min_range_z, max_range_z);
     pass.filter(*m_bin_cloud);
   }
 
@@ -752,6 +741,7 @@ int main(int argc, char** argv) {
   ros::Rate r(100);
   while (ros::ok()) {
     aggregated_cloud_publisher.publishClouds();
+    aggregated_cloud_publisher.publishMarkers();
     // aggregated_cloud_publisher.publishShelfMarkers();
     // aggregated_cloud_publisher.publishCurrentBinMarkers();
     ros::spinOnce();
