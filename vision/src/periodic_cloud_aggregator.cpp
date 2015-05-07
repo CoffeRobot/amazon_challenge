@@ -53,8 +53,8 @@ class PeriodicCloudPublisher {
  public:
   PeriodicCloudPublisher()
       : m_nh(),
-        m_kinect_timeout_ms(4000),
-        m_min_aggregated_cloud_time(8000.0),
+        m_kinect_timeout_ms(4000.0f),
+        m_min_aggregated_cloud_time(10.0),
         m_kinect_last_received(chrono::system_clock::now()),
         m_first_dimage_received(false),
         m_action_server(
@@ -72,7 +72,7 @@ class PeriodicCloudPublisher {
 
     m_client =
         m_nh.serviceClient<laser_assembler::AssembleScans2>("assemble_scans2");
-    m_timer = m_nh.createTimer(ros::Duration(10, 0),
+    m_timer = m_nh.createTimer(ros::Duration(5.0f),
                                &PeriodicCloudPublisher::laserCallback, this);
     m_taskmanager_sub =
         m_nh.subscribe("/amazon_next_task", 10,
@@ -133,7 +133,7 @@ class PeriodicCloudPublisher {
     // publish info to the console for the user
     ROS_INFO("Starting Action");
     m_build_aggregated_cloud = true;
-    m_cloud_req_time = chrono::system_clock::now();
+    m_laser_request_start = ros::Time::now();
     startTiltScanner();
 
     // start executing the action
@@ -147,8 +147,14 @@ class PeriodicCloudPublisher {
         break;
       }
     }
+
+    auto elapsed = (ros::Time::now() - m_laser_request_start).toSec();
+
+    stringstream ss;
+    ss << "CB: Cloud built in: " << elapsed << " secs";
+
     // building the clouds
-    ROS_INFO("Aggregated cloud built");
+    ROS_INFO(ss.str().c_str());
     sensor_msgs::PointCloud2 out_msg, shelf_msg, bin_msg;
     pcl::toROSMsg(m_aggregated_cloud, out_msg);
     pcl::toROSMsg(*m_bin_cloud, bin_msg);
@@ -160,11 +166,7 @@ class PeriodicCloudPublisher {
     m_aggregated_cloud_ready = false;
     m_build_aggregated_cloud = false;
     stopTiltScanner();
-    // publish clouds for debugging purposes
-    // m_publisher.publish(out_msg);
-    // m_shelf_publisher.publish(shelf_msg);
-    // m_bin_publisher.publish(bin_msg);
-    // communicate success to the bt
+    // communicate bt the success
     setStatus(SUCCESS);
   }
 
@@ -213,14 +215,14 @@ class PeriodicCloudPublisher {
     positions.push_back(0);
     positions.push_back(0);
     //= {(d_top / d_top_h), (d_bottom / d_bottom_h)};
-    auto durations = {ros::Duration(0),ros::Duration(10)};
+    auto durations = {ros::Duration(0), ros::Duration(10)};
 
     pr2_msgs::SetLaserTrajCmd srv;
-    //srv.request.command.header.stamp = ros::Time::now();
+    // srv.request.command.header.stamp = ros::Time::now();
     srv.request.command.profile = "linear";
-    srv.request.command.position =positions;
+    srv.request.command.position = positions;
     srv.request.command.time_from_start = durations;
-    srv.request.command.max_velocity  = 0;
+    srv.request.command.max_velocity = 0;
     srv.request.command.max_acceleration = 0;
 
     if (!m_pr2_laser_client.call(srv)) {
@@ -264,24 +266,21 @@ class PeriodicCloudPublisher {
     positions.push_back(start);
     positions.push_back(stop);
     //= {(d_top / d_top_h), (d_bottom / d_bottom_h)};
-    auto durations = {ros::Duration(0),
-                      ros::Duration(10)};
+    auto durations = {ros::Duration(0), ros::Duration(10)};
 
     stringstream ss;
     ss << "TRAJ: " << positions[0] << " " << positions[1];
     ROS_INFO(ss.str().c_str());
 
-
     pr2_msgs::SetLaserTrajCmd srv;
-    //srv.request.command.header.stamp = ros::Time::now();
+    // srv.request.command.header.stamp = ros::Time::now();
     srv.request.command.profile = "linear";
-    srv.request.command.position =positions;
+    srv.request.command.position = positions;
     srv.request.command.time_from_start = durations;
-    srv.request.command.max_velocity  = 10;
+    srv.request.command.max_velocity = 10;
     srv.request.command.max_acceleration = 30;
 
-    if(!m_pr2_laser_client.call(srv))
-    {
+    if (!m_pr2_laser_client.call(srv)) {
       ROS_ERROR("PCA: cannot start pr2 tilt");
     }
   }
@@ -316,7 +315,8 @@ class PeriodicCloudPublisher {
     m_mutex.unlock();
 
     sensor_msgs::PointCloud2 out;
-    pcl_ros::transformPointCloud("base_footprint", *cloud_msg, out, *m_tf_listener);
+    pcl_ros::transformPointCloud("base_footprint", *cloud_msg, out,
+                                 *m_tf_listener);
 
     pcl::fromROSMsg(out, m_kinect_cloud);
   }
@@ -336,47 +336,44 @@ class PeriodicCloudPublisher {
     }
   }
 
-  void labelCloud(pcl::PointCloud<pcl::PointXYZRGB>& cloud)
-  {
-      tf::Vector3 bin_origin;
-      if (getTransformOrigin("shelf_bin_A", bin_origin)) {
-        colorCloudWithBin("bin_A", bin_origin, cloud);
-        ROS_INFO("drawing A");
-      }
-      if (getTransformOrigin("shelf_bin_B", bin_origin)) {
-        colorCloudWithBin("bin_B", bin_origin, cloud);
-      }
-      if (getTransformOrigin("shelf_bin_C", bin_origin)) {
-        colorCloudWithBin("bin_C", bin_origin, cloud);
-      }
-      if (getTransformOrigin("shelf_bin_D", bin_origin)) {
-        colorCloudWithBin("bin_D", bin_origin, cloud);
-      }
-      if (getTransformOrigin("shelf_bin_E", bin_origin)) {
-        colorCloudWithBin("bin_E", bin_origin, cloud);
-      }
-      if (getTransformOrigin("shelf_bin_F", bin_origin)) {
-        colorCloudWithBin("bin_F", bin_origin, cloud);
-      }
-      if (getTransformOrigin("shelf_bin_G", bin_origin)) {
-        colorCloudWithBin("bin_G", bin_origin, cloud);
-      }
-      if (getTransformOrigin("shelf_bin_H", bin_origin)) {
-        colorCloudWithBin("bin_H", bin_origin, cloud);
-      }
-      if (getTransformOrigin("shelf_bin_I", bin_origin)) {
-        colorCloudWithBin("bin_I", bin_origin, cloud);
-      }
-      if (getTransformOrigin("shelf_bin_J", bin_origin)) {
-        colorCloudWithBin("bin_A", bin_origin, cloud);
-      }
-      if (getTransformOrigin("shelf_bin_K", bin_origin)) {
-        colorCloudWithBin("bin_A", bin_origin, cloud);
-      }
-      if (getTransformOrigin("shelf_bin_L", bin_origin)) {
-        colorCloudWithBin("bin_L", bin_origin, cloud);
-      }
-
+  void labelCloud(pcl::PointCloud<pcl::PointXYZRGB>& cloud) {
+    tf::Vector3 bin_origin;
+    if (getTransformOrigin("shelf_bin_A", bin_origin)) {
+      colorCloudWithBin("bin_A", bin_origin, cloud);
+    }
+    if (getTransformOrigin("shelf_bin_B", bin_origin)) {
+      colorCloudWithBin("bin_B", bin_origin, cloud);
+    }
+    if (getTransformOrigin("shelf_bin_C", bin_origin)) {
+      colorCloudWithBin("bin_C", bin_origin, cloud);
+    }
+    if (getTransformOrigin("shelf_bin_D", bin_origin)) {
+      colorCloudWithBin("bin_D", bin_origin, cloud);
+    }
+    if (getTransformOrigin("shelf_bin_E", bin_origin)) {
+      colorCloudWithBin("bin_E", bin_origin, cloud);
+    }
+    if (getTransformOrigin("shelf_bin_F", bin_origin)) {
+      colorCloudWithBin("bin_F", bin_origin, cloud);
+    }
+    if (getTransformOrigin("shelf_bin_G", bin_origin)) {
+      colorCloudWithBin("bin_G", bin_origin, cloud);
+    }
+    if (getTransformOrigin("shelf_bin_H", bin_origin)) {
+      colorCloudWithBin("bin_H", bin_origin, cloud);
+    }
+    if (getTransformOrigin("shelf_bin_I", bin_origin)) {
+      colorCloudWithBin("bin_I", bin_origin, cloud);
+    }
+    if (getTransformOrigin("shelf_bin_J", bin_origin)) {
+      colorCloudWithBin("bin_A", bin_origin, cloud);
+    }
+    if (getTransformOrigin("shelf_bin_K", bin_origin)) {
+      colorCloudWithBin("bin_A", bin_origin, cloud);
+    }
+    if (getTransformOrigin("shelf_bin_L", bin_origin)) {
+      colorCloudWithBin("bin_L", bin_origin, cloud);
+    }
   }
 
   void laserCallback(const ros::TimerEvent& e) {
@@ -394,52 +391,51 @@ class PeriodicCloudPublisher {
       return;
     }
 
+    auto secs = (ros::Time::now() - m_laser_request_start).toSec();
+
+    if (secs < m_min_aggregated_cloud_time) return;
+
     // Populate our service request based on our timer callback times
     laser_assembler::AssembleScans2 srv;
-    srv.request.begin = e.last_real;
-    srv.request.end = e.current_real;
+
+    srv.request.begin = m_laser_request_start;
+    srv.request.end = m_laser_request_start + ros::Duration(10);
 
     // Make the service call
     if (m_client.call(srv)) {
 
-      auto elapsed = chrono::duration_cast<chrono::milliseconds>(
-          chrono::system_clock::now() - m_cloud_req_time).count();
+      auto elapsed = (ros::Time::now() - m_laser_request_start).toSec();
 
-      if (elapsed > m_min_aggregated_cloud_time) {
-        sensor_msgs::PointCloud2 msg = srv.response.cloud;
+      sensor_msgs::PointCloud2 msg = srv.response.cloud;
 
-        if (!m_first_dimage_received) {
-          // ROS_INFO("Kinect depth not available yet");
-          return;
-        }
-        pcl::PointCloud<pcl::PointXYZ> laser_cloud;
-        pcl::fromROSMsg(msg, laser_cloud);
+      stringstream ss;
+      ss << "LC: service callded after secs: " << elapsed;
+      ROS_INFO(ss.str().c_str());
 
-        // ROS_INFO("Before cloud message");
-
-        buildPointCloudMessage();
-
-        // ROS_INFO("After cloud message");
-        m_aggregated_cloud = laser_cloud;
-        m_aggregated_cloud += m_kinect_cloud;
-
-
-        pcl::copyPointCloud(m_aggregated_cloud, m_colored_cloud);
-        labelCloud(m_colored_cloud);
-
-        //pcl::io::savePCDFileASCII ("test_pcd.pcd", m_colored_cloud);
-
-        createCloudBin(m_aggregated_cloud);
-        CreateCloudShelf(m_aggregated_cloud);
-
-        m_aggregated_cloud_ready = true;
-        stringstream ss;
-        ss << "Aggregated cloud built with points: "
-           << m_aggregated_cloud.points.size();
-        ROS_INFO(ss.str().c_str());
-      } else {
-        // do nothing, must wait for the next laser scan service to return
+      if (!m_first_dimage_received) {
+        // ROS_INFO("Kinect depth not available yet");
+        return;
       }
+      pcl::PointCloud<pcl::PointXYZ> laser_cloud;
+      pcl::fromROSMsg(msg, laser_cloud);
+
+      buildPointCloudMessage();
+
+      m_aggregated_cloud = laser_cloud;
+      m_aggregated_cloud += m_kinect_cloud;
+
+      createCloudBin(m_aggregated_cloud);
+      CreateCloudShelf(m_aggregated_cloud);
+
+      m_aggregated_cloud_ready = true;
+
+      elapsed = (ros::Time::now() - m_laser_request_start).toSec();
+
+      stringstream ss1;
+      ss1 << "Aggregated cloud built with points: "
+          << m_aggregated_cloud.points.size() << " in " << elapsed << " secs";
+      ROS_INFO(ss1.str().c_str());
+
     } else {
       ROS_ERROR("Error making service call\n");
     }
@@ -512,69 +508,67 @@ class PeriodicCloudPublisher {
       m_shelf_marker_pub.publish(shelf_marker);
   }*/
 
-  void publishCurrentBinMarkers()
-  {
+  void publishCurrentBinMarkers() {
 
-      string target_frame = "base_footprint";
-      string dest_frame = "shelf_" + m_bin_name;
-      tf::StampedTransform transform;
-      try {
-        m_tf_listener->lookupTransform(target_frame, dest_frame, ros::Time(0),
-                                       transform);
-      }
-      catch (tf::TransformException& ex) {
-        ROS_ERROR("Error in shelf publish of type %s", ex.what());
-        return;
-      }
-      auto origin = transform.getOrigin();
-      visualization_msgs::Marker marker;
-      marker.header.frame_id = target_frame;
-
-      marker.header.stamp = ros::Time::now();
-      marker.type = visualization_msgs::Marker::CUBE;
-      marker.ns = "bin";
-      marker.id = 1;
-      marker.action = visualization_msgs::Marker::ADD;
-
-      marker.pose.orientation.x = 0.0;
-      marker.pose.orientation.y = 0.0;
-      marker.pose.orientation.z = 0.0;
-      marker.pose.orientation.w = 1.0;
-
-      marker.color.r = 0.0f;
-      marker.color.g = 1.0f;
-      marker.color.b = 0.0f;
-      marker.color.a = 0.3;
-
-      marker.lifetime = ros::Duration();
-
-    if(m_bin_name.compare("bin_A") == 0 || m_bin_name.compare("bin_B") == 0 ||
-       m_bin_name.compare("bin_C") == 0 || m_bin_name.compare("bin_J") == 0 ||
-       m_bin_name.compare("bin_K") == 0 || m_bin_name.compare("bin_L") == 0)
-    {
-        marker.pose.position.x = origin.x() -0.01;
-        marker.pose.position.y = origin.y() -0.03;
-        marker.pose.position.z = origin.z() -0.04;
-        marker.scale.x = 0.44;
-        marker.scale.y = 0.31;
-        marker.scale.z = 0.32;
-        //ROS_INFO("Big bin");
-
+    string target_frame = "base_footprint";
+    string dest_frame = "shelf_" + m_bin_name;
+    tf::StampedTransform transform;
+    try {
+      m_tf_listener->lookupTransform(target_frame, dest_frame, ros::Time(0),
+                                     transform);
     }
-    else if(m_bin_name.compare("bin_D") == 0 || m_bin_name.compare("bin_E") == 0 ||
-            m_bin_name.compare("bin_F") == 0 || m_bin_name.compare("bin_G") == 0 ||
-            m_bin_name.compare("bin_H") == 0 || m_bin_name.compare("bin_I") == 0)
-    {
-        marker.pose.position.x = origin.x() + 0.21;
-        marker.pose.position.y = origin.y() + 0.14;
-        marker.pose.position.z = origin.z() + 0.11;
-        marker.scale.x = 0.42;
-        marker.scale.y = 0.28;
-        marker.scale.z = 0.22;
-        //ROS_INFO("Small bin");
+    catch (tf::TransformException& ex) {
+      ROS_ERROR("Error in shelf publish of type %s", ex.what());
+      return;
+    }
+    auto origin = transform.getOrigin();
+    visualization_msgs::Marker marker;
+    marker.header.frame_id = target_frame;
+
+    marker.header.stamp = ros::Time::now();
+    marker.type = visualization_msgs::Marker::CUBE;
+    marker.ns = "bin";
+    marker.id = 1;
+    marker.action = visualization_msgs::Marker::ADD;
+
+    marker.pose.orientation.x = 0.0;
+    marker.pose.orientation.y = 0.0;
+    marker.pose.orientation.z = 0.0;
+    marker.pose.orientation.w = 1.0;
+
+    marker.color.r = 0.0f;
+    marker.color.g = 1.0f;
+    marker.color.b = 0.0f;
+    marker.color.a = 0.3;
+
+    marker.lifetime = ros::Duration();
+
+    if (m_bin_name.compare("bin_A") == 0 || m_bin_name.compare("bin_B") == 0 ||
+        m_bin_name.compare("bin_C") == 0 || m_bin_name.compare("bin_J") == 0 ||
+        m_bin_name.compare("bin_K") == 0 || m_bin_name.compare("bin_L") == 0) {
+      marker.pose.position.x = origin.x() - 0.01;
+      marker.pose.position.y = origin.y() - 0.03;
+      marker.pose.position.z = origin.z() - 0.04;
+      marker.scale.x = 0.44;
+      marker.scale.y = 0.31;
+      marker.scale.z = 0.32;
+      // ROS_INFO("Big bin");
+
+    } else if (m_bin_name.compare("bin_D") == 0 ||
+               m_bin_name.compare("bin_E") == 0 ||
+               m_bin_name.compare("bin_F") == 0 ||
+               m_bin_name.compare("bin_G") == 0 ||
+               m_bin_name.compare("bin_H") == 0 ||
+               m_bin_name.compare("bin_I") == 0) {
+      marker.pose.position.x = origin.x() + 0.21;
+      marker.pose.position.y = origin.y() + 0.14;
+      marker.pose.position.z = origin.z() + 0.11;
+      marker.scale.x = 0.42;
+      marker.scale.y = 0.28;
+      marker.scale.z = 0.22;
+      // ROS_INFO("Small bin");
     }
     m_bin_marker_pub.publish(marker);
-
   }
 
   void publishClouds() {
@@ -590,10 +584,7 @@ class PeriodicCloudPublisher {
     m_bin_publisher.publish(bin_msg);
   }
 
-  void publishMarkers()
-  {
-   publishCurrentBinMarkers();
-  }
+  void publishMarkers() { publishCurrentBinMarkers(); }
 
  private:
   bool getBinType(string bin_name) {
@@ -702,48 +693,25 @@ class PeriodicCloudPublisher {
     pass.filter(*m_bin_cloud);
   }
 
-  /*void getShelfMarker(visualization_msgs::Marker& marker)
-  {
-      marker.header.stamp = ros::Time::now();
-      marker.type = visualization_msgs::Marker::CUBE;
-      marker.ns = "shelf";
-      marker.id = 0;
-      marker.action = visualization_msgs::Marker::ADD;
-      marker.pose.position.x = 0.43;
-      marker.pose.position.y = 0;
-      marker.pose.position.z = 0.88;
-      marker.pose.orientation.x = 0.0;
-      marker.pose.orientation.y = 0.0;
-      marker.pose.orientation.z = 0.0;
-      marker.pose.orientation.w = 1.0;
-
-      marker.scale.x = 1.0;
-      marker.scale.y = 1.0;
-      marker.scale.z = 2.4;
-
-      marker.color.r = 1.0f;
-      marker.color.g = 1.0f;
-      marker.color.b = 1.0f;
-      marker.color.a = 0.1;
-
-      marker.lifetime = ros::Duration();
-  }*/
-
+  // publishers
   ros::Publisher m_publisher, m_shelf_publisher, m_bin_publisher;
+  // service clients
   ros::ServiceClient m_client, m_segmentation_client, m_tracking_client,
       m_pr2_laser_client;
+  // subscribers
   ros::Subscriber m_kinect_subscriber, m_camera_info_sub, m_taskmanager_sub;
+  // timers
   ros::Timer m_timer;
   bool m_first_time;
   bool m_first_dimage_received;
-  unique_ptr<tf::TransformListener> m_tf_listener;
-
   chrono::time_point<chrono::system_clock> m_kinect_start, m_kinect_end,
       m_laser_start, m_laser_end;
   chrono::time_point<chrono::system_clock> m_kinect_last_received;
   float m_kinect_timeout_ms;
-  chrono::time_point<chrono::system_clock> m_cloud_req_time;
+  ros::Time m_laser_request_start;
   float m_min_aggregated_cloud_time;
+
+  unique_ptr<tf::TransformListener> m_tf_listener;
 
   string m_bin_name;
   string m_obj_name;
