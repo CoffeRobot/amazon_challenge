@@ -82,7 +82,7 @@ class PeriodicCloudPublisher {
         "/head_mount_kinect/depth/image_raw", 1,
         &PeriodicCloudPublisher::depthCallback, this);
     m_camera_info_sub = m_nh.subscribe<sensor_msgs::CameraInfo>(
-        "/head_mount_kinect/rgb/camera_info", 1,
+        "/head_mount_kinect/depth/camera_info", 1,
         &PeriodicCloudPublisher::cameraInfoCallback, this);
 
     m_tf_listener =
@@ -312,6 +312,8 @@ class PeriodicCloudPublisher {
 
     // cloud_msg->header.frame_id = m_camera_info_msg.header.frame_id;
     cloud_msg->header.frame_id = m_last_depth_msg->header.frame_id;
+    string s = "img2cloud " + cloud_msg->header.frame_id;
+    ROS_INFO(s.c_str());
     m_mutex.unlock();
 
     sensor_msgs::PointCloud2 out;
