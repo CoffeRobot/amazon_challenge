@@ -4,8 +4,10 @@
 #include <string>
 #include <mutex>
 #include <tf/transform_listener.h>
+#include <tf/transform_broadcaster.h>
 #include <tf_conversions/tf_eigen.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <std_msgs/String.h>
 #include <pcl/point_cloud.h>
 #include <pcl/PCLPointCloud2.h>
 #include <pcl/point_types.h>
@@ -46,6 +48,10 @@ class CloudSegmenter {
         m_nh.advertise<sensor_msgs::PointCloud2>("segmentation_cloud", 1);
     m_marker_pub =
         m_nh.advertise<visualization_msgs::Marker>("cluster_markers", 1);
+    m_task_subscriber =
+            m_nh.subscribe("/amazon_next_task", 10,
+                           &CloudSegmenter::nextTaskCallback, this);
+
     m_segmentation_request = false;
   };
 
@@ -64,9 +70,21 @@ class CloudSegmenter {
     m_segmentation_request = true;
     pcl::copyPointCloud(m_cloud, m_cloud_colour);
 
-    pcl::io::savePCDFileASCII("test_pcd.pcd", m_cloud);
+    //pcl::io::savePCDFileASCII("test_pcd.pcd", m_cloud);
 
     return true;
+  }
+
+  void nextTaskCallback(const std_msgs::String::ConstPtr& msg) {
+    m_bin_name = "";
+    m_obj_name = "";
+
+    for (auto i = 1; i < msg->data.length() - 1; i++) {
+      if (i < 6)
+        m_bin_name += msg->data[i];
+      else if (i > 6)
+        m_obj_name += msg->data[i];
+    }
   }
 
   void segmentCloud() {
@@ -117,7 +135,87 @@ class CloudSegmenter {
     }
   }
 
+  void publishTFPose()
+  {
+
+    for(auto i = 0; i < m_found_clusters.size(); ++i)
+    {
+     Eigen::Vector4f centroid;
+     Eigen::Quaternionf rotation;
+     tf::Vector3 tf_centroid;
+     tf::Quaternion tf_rotation;
+     extractPose(m_found_clusters[i], centroid, rotation);
+     //tf::vectorEigenToTF(centroid, tf_centroid);
+     //tf::quaternionEigenToTF(rotation, tf_rotation);
+
+     tf::Transform transform;
+     transform.setOrigin( tf::Vector3(centroid.x(),centroid.y(),centroid.z()) );
+     transform.setRotation(
+                 tf::Quaternion(rotation.x(),
+                                rotation.y(),
+                                rotation.z(),
+                                rotation.w()));
+
+     stringstream ss;
+
+     if(i == 0)
+     {
+      ss << m_obj_name << "_seg";
+     }
+     else
+     {
+        ss << "clust_" << i << "_seg";
+     }
+
+     ROS_INFO(ss.str().c_str());
+
+     m_tf_broadcaster.sendTransform(
+                 tf::StampedTransform(transform,
+                                      ros::Time::now(),
+                                      "base_footprint",
+                                      ss.str()));
+    }
+
+  }
+
  private:
+
+  void extractPose(const pcl::PointCloud<pcl::PointXYZ> &in_cloud, Eigen::Vector4f& centroid, Eigen::Quaternionf& rotation)
+  {
+      pcl::PointCloud<pcl::PointXYZ>::Ptr point_cloud_ptr =
+          in_cloud.makeShared();
+      // compute principal direction
+
+      pcl::compute3DCentroid(*point_cloud_ptr, centroid);
+      Eigen::Matrix3f covariance;
+      computeCovarianceMatrixNormalized(*point_cloud_ptr, centroid, covariance);
+      Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eigen_solver(
+          covariance, Eigen::ComputeEigenvectors);
+      Eigen::Matrix3f eigDx = eigen_solver.eigenvectors();
+      eigDx.col(2) = eigDx.col(0).cross(eigDx.col(1));
+
+      // move the points to the that reference frame
+      Eigen::Matrix4f p2w(Eigen::Matrix4f::Identity());
+      p2w.block<3, 3>(0, 0) = eigDx.transpose();
+      p2w.block<3, 1>(0, 3) = -1.f * (p2w.block<3, 3>(0, 0) * centroid.head<3>());
+      pcl::PointCloud<pcl::PointXYZ> cPoints;
+      pcl::transformPointCloud(*point_cloud_ptr, cPoints, p2w);
+
+      pcl::PointXYZ min_pt, max_pt;
+      pcl::getMinMax3D(cPoints, min_pt, max_pt);
+      Eigen::Vector3f mean_diag =
+          0.5f * (max_pt.getVector3fMap() + min_pt.getVector3fMap());
+
+      // final transform
+      Eigen::Quaternionf qfinal(eigDx);
+
+      Eigen::Vector3f tfinal =
+          eigDx * mean_diag +
+          centroid.head<3>();
+
+      rotation = qfinal;
+  }
+
   void publishSegmentation(const pcl::PointCloud<pcl::PointXYZRGB> &in_cloud) {
     sensor_msgs::PointCloud2 cloud;
     pcl::toROSMsg(in_cloud, cloud);
@@ -181,19 +279,6 @@ class CloudSegmenter {
     marker.scale.y = max_pt.y - min_pt.y;
     marker.scale.z = max_pt.z - min_pt.z;
 
-    /*marker.pose.position.x = centroid[0];
-    marker.pose.position.y = centroid[1];
-    marker.pose.position.z = centroid[2];
-    marker.pose.orientation.x = 0.0;
-    marker.pose.orientation.y = 0.0;
-    marker.pose.orientation.z = 0.0;
-    marker.pose.orientation.w = 1.0;
-
-    marker.scale.x = (max[0] - min[0]);
-    marker.scale.y = (max[1] - min[1]);
-    marker.scale.z = (max[2] - min[2]);
-   */
-
     if (marker.scale.x == 0) marker.scale.x = 0.1;
 
     if (marker.scale.y == 0) marker.scale.y = 0.1;
@@ -214,13 +299,18 @@ class CloudSegmenter {
   ros::Publisher m_segmentation_pub, m_marker_pub;
   ros::ServiceServer m_service_server;
   tf::TransformListener m_tf_listener;
+  tf::TransformBroadcaster m_tf_broadcaster;
   visualization_msgs::Marker m_shelf_marker;
+  ros::Subscriber m_task_subscriber;
 
   std::mutex m_mutex;
   pcl::PointCloud<pcl::PointXYZ> m_cloud, m_filtered_cloud, m_plane_cloud;
   pcl::PointCloud<pcl::PointXYZRGB> m_cloud_colour;
   vector<pcl::PointCloud<pcl::PointXYZ>> m_found_clusters;
   atomic_bool m_segmentation_request;
+
+  string m_bin_name;
+  string m_obj_name;
 };
 }
 int main(int argc, char **argv) {
@@ -233,6 +323,7 @@ int main(int argc, char **argv) {
   while (ros::ok()) {
     cs.segmentCloud();
     cs.publishMarkers();
+    cs.publishTFPose();
     ros::spinOnce();
     r.sleep();
   }
