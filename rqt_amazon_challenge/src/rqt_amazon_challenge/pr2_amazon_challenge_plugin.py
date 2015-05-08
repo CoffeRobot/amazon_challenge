@@ -110,6 +110,7 @@ class PR2AmazonChallengePlugin(Plugin):
 
         self._tool_size = rospy.get_param('/tool_size', [0.16, 0.02, 0.04])
         self._contest = rospy.get_param('/contest', True)
+        self._item = ''
 
         if self._contest:
             self._length_tool = 0.18 + self._tool_size[0]
@@ -150,9 +151,9 @@ class PR2AmazonChallengePlugin(Plugin):
 
         self._widget.arms_start_pos_button.clicked[bool].connect(self._handle_arms_start_pos_button_clicked)
 
-        self._widget.base_drop_button.clicked[bool].connect(self._handle_base_drop_button_clicked)
-        self._widget.base_drop_cheezit_button.clicked[bool].connect(self._handle_base_drop_cheezit_button_clicked)
-        self._widget.base_drop_oreo_button_clicked[bool].connect(self._handle_base_drop_oreo_button_clicked)
+        self._widget.drop_button.clicked[bool].connect(self._handle_drop_button_clicked)
+        self._widget.drop_cheezit_button.clicked[bool].connect(self._handle_drop_cheezit_button_clicked)
+        self._widget.drop_oreo_button.clicked[bool].connect(self._handle_drop_oreo_button_clicked)
 
 
         self._widget.pc_perception_button.clicked[bool].connect(self._handle_pc_perception_button_clicked)
@@ -423,7 +424,7 @@ class PR2AmazonChallengePlugin(Plugin):
         self._head.go()
 
 
-    def _handle_base_drop_button_clicked(self):
+    def _handle_drop_button_clicked(self):
         rospy.loginfo('[GUI]: going to drop object')
         base_pos_dict = rospy.get_param('/base_pos_dict')
         torso_joint_pos_dict = rospy.get_param('/torso_joint_pos_dict')
@@ -437,7 +438,7 @@ class PR2AmazonChallengePlugin(Plugin):
         self._bm.goAngle(base_pos_goal[5])
 
         # retreat
-        base_pos_goal = base_pos_dict['drop']['retreat']
+        base_pos_goal = base_pos_dict['drop']['retreat'+self._item]
         self._bm.goAngle(base_pos_goal[5])
         self._bm.goPosition(base_pos_goal[0:2])
         self._bm.goAngle(base_pos_goal[5])
@@ -466,14 +467,14 @@ class PR2AmazonChallengePlugin(Plugin):
         ######################################
         # move left arm down
         # calculate how much to go down
-        z_init = self._left_arm.get_current_pose().pose.position.z
+        z_init = copy.deepcopy(self._left_arm.get_current_pose().pose.position.z)
 
         z_desired = dropping_height # maximum 30 cm dropping height
         waypoints = []
 
-        waypoints.append(self._left_arm.get_current_pose().pose)
+        #waypoints.append(self._left_arm.get_current_pose().pose)
 
-        wpose = copy.deepcopy(waypoints[0])
+        wpose = copy.deepcopy(self._left_arm.get_current_pose().pose)
         wpose.position.z = z_desired + self._length_tool
 
         waypoints.append(copy.deepcopy(wpose))
@@ -482,9 +483,47 @@ class PR2AmazonChallengePlugin(Plugin):
 
         self._left_arm.execute(plan)
 
+        ######################################
+        # release gripper
+        gripper_command_msg = Pr2GripperCommand()
+        gripper_command_msg.max_effort = 40.0
+        gripper_command_msg.position = 10.0
+
+        self._l_gripper_pub.publish(gripper_command_msg)
+        t_init = rospy.Time.now()
+
+        r = rospy.Rate(1.0)
+
+        while (rospy.Time.now()-t_init).to_sec() < 5.0 and not rospy.is_shutdown():
+            r.sleep()
+
+        ######################################
+        # move left arm up
+        # calculate how much to go up
+
+        z_desired = z_init # maximum 30 cm dropping height
+        waypoints = []
+
+        #waypoints.append(self._left_arm.get_current_pose().pose)
+
+        wpose = copy.deepcopy(self._left_arm.get_current_pose().pose)
+        wpose.position.z = z_desired + self._length_tool
+
+        waypoints.append(copy.deepcopy(wpose))
+
+        (plan, fraction) = self._left_arm.compute_cartesian_path(waypoints, 0.005, 0.0)
+
+        self._left_arm.execute(plan)
+        self._item = ''
 
 
-    def _handle_base_drop_cheezit_button_clicked(self):
+    def _handle_drop_cheezit_button_clicked(self):
+        self._item = '_cheezit_big_original'
+        self._handle_drop_button_clicked()
+
+    def _handle_drop_oreo_button_clicked(self):
+        self._item = '_oreo_mega_stuf'
+        self._handle_drop_button_clicked()
 
 
 

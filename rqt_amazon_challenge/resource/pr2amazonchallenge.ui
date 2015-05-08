@@ -508,7 +508,7 @@
       <string>Dropping</string>
      </property>
     </widget>
-    <widget class="QPushButton" name="base_drop_button">
+    <widget class="QPushButton" name="drop_button">
      <property name="geometry">
       <rect>
        <x>120</x>
@@ -521,7 +521,7 @@
       <string>drop</string>
      </property>
     </widget>
-    <widget class="QPushButton" name="base_drop_cheezit_button">
+    <widget class="QPushButton" name="drop_cheezit_button">
      <property name="geometry">
       <rect>
        <x>240</x>
@@ -534,7 +534,7 @@
       <string>drop_cheezit</string>
      </property>
     </widget>
-    <widget class="QPushButton" name="base_drop_oreo_button">
+    <widget class="QPushButton" name="drop_oreo_button">
      <property name="geometry">
       <rect>
        <x>400</x>
