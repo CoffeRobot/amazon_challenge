@@ -119,38 +119,49 @@ void ObjectSegmentation::clusterComponentsEuclidean(
   }
 }
 
-void ObjectSegmentation::findClusterOBB(
-    pcl::PointCloud<pcl::PointXYZ> &cloud_cluster, Eigen::Vector3f &position,
-    Eigen::Quaternionf &rotation, float &w, float &h, float &d) {
-  /*for (auto i = 0; i < m_found_clusters.size(); ++i) {
-    pcl::PCA<pcl::PointXYZ> pca;
-    pcl::PointCloud<pcl::PointXYZ> proj;
+void ObjectSegmentation::extractPose(
+    const pcl::PointCloud<pcl::PointXYZ> &cloud,
+    Eigen::Vector4f &centroid, Eigen::Quaternionf &rotation, float &w, float &h,
+    float &d)
+{
+  pcl::compute3DCentroid(cloud, centroid);
+  Eigen::Matrix3f covariance;
+  computeCovarianceMatrixNormalized(cloud, centroid, covariance);
+  Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eigen_solver(
+      covariance, Eigen::ComputeEigenvectors);
+  Eigen::Matrix3f eigDx = eigen_solver.eigenvectors();
+  eigDx.col(2) = eigDx.col(0).cross(eigDx.col(1));
 
-    pca.setInputCloud(m_found_clusters[i].makeShared());
-    pca.project(m_found_clusters[i], proj);
+  // move the points to the that reference frame
+  Eigen::Matrix4f p2w(Eigen::Matrix4f::Identity());
+  p2w.block<3, 3>(0, 0) = eigDx.transpose();
+  p2w.block<3, 1>(0, 3) = -1.f * (p2w.block<3, 3>(0, 0) * centroid.head<3>());
+  pcl::PointCloud<pcl::PointXYZ> cPoints;
+  pcl::transformPointCloud(cloud, cPoints, p2w);
 
-    pcl::PointXYZ proj_min, proj_max;
-    pcl::getMinMax3D(proj, proj_min, proj_max);
+  pcl::PointXYZ min_pt, max_pt;
+  pcl::getMinMax3D(cPoints, min_pt, max_pt);
+  Eigen::Vector3f mean_diag =
+      0.5f * (max_pt.getVector3fMap() + min_pt.getVector3fMap());
 
-    rotation = Eigen::Quaternionf(pca.getEigenVectors());
+  // final transform
+  Eigen::Quaternionf qfinal(eigDx);
 
-    Eigen::Vector4f t = pca.getMean();
-    position = Eigen::Vector3f(t.x(), t.y(), t.z());
+  Eigen::Vector3f tfinal = eigDx * mean_diag + centroid.head<3>();
 
-    float width = fabs(proj_max.x - proj_min.x);
-    float height = fabs(proj_max.y - proj_min.y);
-    float depth = fabs(proj_max.z - proj_min.z);
-  }*/
+  rotation = qfinal;
+  w = max_pt.x - min_pt.x;
+  h = max_pt.y - min_pt.y;
+  d = max_pt.z - min_pt.z;
 }
 
 void ObjectSegmentation::findClusterBB(
-    pcl::PointCloud<pcl::PointXYZ> &cloud_cluster, Eigen::Vector4f& centroid,
-    float &w, float &h, float &d)
-{
-    Eigen::Vector4f min;
-    Eigen::Vector4f max;
-    pcl::compute3DCentroid(cloud_cluster, centroid);
-    pcl::getMinMax3D(cloud_cluster, min, max);
+    pcl::PointCloud<pcl::PointXYZ> &cloud_cluster, Eigen::Vector4f &centroid,
+    float &w, float &h, float &d) {
+  Eigen::Vector4f min;
+  Eigen::Vector4f max;
+  pcl::compute3DCentroid(cloud_cluster, centroid);
+  pcl::getMinMax3D(cloud_cluster, min, max);
 }
 
 }  // end namespace

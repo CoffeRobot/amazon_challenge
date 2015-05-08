@@ -16,6 +16,8 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/point_cloud_conversion.h>
 #include <sensor_msgs/image_encodings.h>
+#include <image_transport/image_transport.h>
+#include <image_transport/subscriber_filter.h>
 #include <memory>
 #include <chrono>
 #include <sstream>
@@ -30,6 +32,9 @@
 #include <atomic>
 #include <thread>
 #include <visualization_msgs/Marker.h>
+#include <message_filters/subscriber.h>
+#include <message_filters/time_synchronizer.h>
+#include <message_filters/sync_policies/approximate_time.h>
 
 // Services
 #include <laser_assembler/AssembleScans2.h>
@@ -64,6 +69,7 @@ class PeriodicCloudPublisher {
         m_build_aggregated_cloud(false),
         m_bin_cloud(new pcl::PointCloud<pcl::PointXYZ>),
         m_shelf_cloud(new pcl::PointCloud<pcl::PointXYZ>) {
+
     m_publisher = m_nh.advertise<sensor_msgs::PointCloud2>("periodic_cloud", 1);
     m_shelf_publisher =
         m_nh.advertise<sensor_msgs::PointCloud2>("periodic_cloud_shelf", 1);
@@ -79,12 +85,38 @@ class PeriodicCloudPublisher {
                        &PeriodicCloudPublisher::taskmanagerCallback, this);
 
     m_kinect_subscriber = m_nh.subscribe<sensor_msgs::Image>(
-        "/head_mount_kinect/depth/image_raw", 1,
+        "/head_mount_kinect/depth_registered/sw_registered/image_rect_raw", 1,
         &PeriodicCloudPublisher::depthCallback, this);
     m_camera_info_sub = m_nh.subscribe<sensor_msgs::CameraInfo>(
-        "/head_mount_kinect/depth/camera_info", 1,
+        "/head_mount_kinect/depth_registered/sw_registered/camera_info", 1,
         &PeriodicCloudPublisher::cameraInfoCallback, this);
 
+    m_depth_it.reset(new image_transport::ImageTransport(m_nh));
+    m_sub_depth.subscribe(*m_depth_it, "/head_mount_kinect/depth_registered/sw_registered", 1, image_transport::TransportHints("raw"));
+    m_rgb_it.reset(new image_transport::ImageTransport(m_nh));
+    m_sub_rgb.subscribe(*m_rgb_it, "/head_mount_kinect/rgb/image_rect_color", 1, image_transport::TransportHints("raw"));
+    m_sub_rgb_info.subscribe(m_nh, "/head_mount_kinect/rgb/camera_info", 1);
+
+    m_sync_rgbd.reset(new SynchronizerRGBD(SyncPolicyRGBD(5), m_sub_depth,
+                                           m_sub_rgb, m_sub_rgb_info));
+    m_sync_rgbd->registerCallback(boost::bind(&PeriodicCloudPublisher::rgbdCallback, this, _1, _2, _3));
+
+
+    /*
+     * m_rgb_filter.subscribe(
+         m_nh, "/head_mount_kinect/rgb/image_rect_color/compressed", 1);
+     m_camera_info_filter.subscribe(m_nh, "/head_mount_kinect/rgb/camera_info",
+                                    1);
+     m_depth_filter.subscribe(
+         m_nh,
+         "/head_mount_kinect/depth_registered/sw_registered/image_rect_raw", 1);
+     m_kinect_sync = std::make_shared<SynchronizerRGBD>(new SynchronizerRGBD(
+         m_rgb_filter, m_depth_filter, m_camera_info_filter,
+     SyncPolicyRGBD(5)));
+
+     m_kinect_sync->registerCallback(
+         boost::bind(&PeriodicCloudPublisher::rgbdCallback, this, _1, _2, _3));
+     */
     m_tf_listener =
         unique_ptr<tf::TransformListener>(new tf::TransformListener());
 
@@ -443,6 +475,25 @@ class PeriodicCloudPublisher {
     }
   }
 
+  void rgbdCallback(const sensor_msgs::ImageConstPtr& depth_msg,
+                    const sensor_msgs::ImageConstPtr& rgb_msg,
+                    const sensor_msgs::CameraInfoConstPtr& rgb_info_msg) {
+
+    ROS_INFO("Received full optional kinect data :)");
+
+    auto can_lock = m_mutex.try_lock();
+
+    if (can_lock) {
+      // ROS_INFO("Mutex locked by kinect");
+      m_last_depth_msg = depth_msg;
+      m_last_rgb_msg = rgb_msg;
+      m_mutex.unlock();
+      // ROS_INFO("Mutex unlocked by kinect");
+    } else
+      return;
+
+  }
+
   void depthCallback(const sensor_msgs::ImageConstPtr& depth_msg) {
 
     if (!m_build_aggregated_cloud) {
@@ -520,7 +571,7 @@ class PeriodicCloudPublisher {
                                      transform);
     }
     catch (tf::TransformException& ex) {
-      ROS_ERROR("Error in shelf publish of type %s", ex.what());
+      //ROS_ERROR("Error in shelf publish of type %s", ex.what());
       return;
     }
     auto origin = transform.getOrigin();
@@ -702,6 +753,25 @@ class PeriodicCloudPublisher {
       m_pr2_laser_client;
   // subscribers
   ros::Subscriber m_kinect_subscriber, m_camera_info_sub, m_taskmanager_sub;
+  // message filter
+  boost::shared_ptr<image_transport::ImageTransport> m_rgb_it, m_depth_it;
+  image_transport::SubscriberFilter m_sub_depth, m_sub_rgb;
+  message_filters::Subscriber<sensor_msgs::CameraInfo> m_sub_rgb_info;
+  typedef message_filters::sync_policies::ApproximateTime<
+      sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo>
+      SyncPolicyRGBD;
+  typedef message_filters::Synchronizer<SyncPolicyRGBD> SynchronizerRGBD;
+  boost::shared_ptr<SynchronizerRGBD> m_sync_rgbd;
+
+  // message_filters::Subscriber<sensor_msgs::Image> m_rgb_filter;
+  // message_filters::Subscriber<sensor_msgs::CameraInfo> m_camera_info_filter;
+  // message_filters::Subscriber<sensor_msgs::Image> m_depth_filter;
+  // typedef message_filters::sync_policies::ApproximateTime<
+  //    sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo>
+  //    SyncPolicyRGBD;
+  // typedef message_filters::Synchronizer<SyncPolicyRGBD> SynchronizerRGBD;
+  // std::shared_ptr<SynchronizerRGBD> m_kinect_sync;
+
   // timers
   ros::Timer m_timer;
   bool m_first_time;
@@ -726,6 +796,7 @@ class PeriodicCloudPublisher {
 
   sensor_msgs::CameraInfo m_camera_info_msg;
   sensor_msgs::ImageConstPtr m_last_depth_msg;
+  sensor_msgs::ImageConstPtr m_last_rgb_msg;
   std::mutex m_mutex;
 
   std::atomic_bool m_build_aggregated_cloud, m_aggregated_cloud_ready;

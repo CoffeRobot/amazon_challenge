@@ -8,6 +8,7 @@
 #include <pcl/PCLPointCloud2.h>
 #include <pcl/point_types.h>
 #include <eigen3/Eigen/Geometry>
+#include <eigen3/Eigen/Core>
 #include <pcl/common/common.h>
 #include <pcl/common/pca.h>
 #include <vector>
@@ -30,9 +31,9 @@ class ObjectSegmentation {
       pcl::PointCloud<pcl::PointXYZ>& in_cloud,
       std::vector<pcl::PointCloud<pcl::PointXYZ>>& clusters);
 
-  void findClusterOBB(pcl::PointCloud<pcl::PointXYZ>& cloud_cluster,
-                      Eigen::Vector3f& position, Eigen::Quaternionf& rotation,
-                      float& w, float& h, float& d);
+  void extractPose(const pcl::PointCloud<pcl::PointXYZ>& cloud,
+                   Eigen::Vector4f& centroid, Eigen::Quaternionf& rotation,
+                   float& w, float& h, float& d);
 
   void findClusterBB(pcl::PointCloud<pcl::PointXYZ>& cloud_cluster,
                      Eigen::Vector4f& centroid, float& w, float& h, float& d);
