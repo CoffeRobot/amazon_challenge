@@ -42,6 +42,9 @@ from python_qt_binding import loadUi
 from python_qt_binding.QtGui import QWidget, QMainWindow, QGraphicsView
 import numpy as np
 import moveit_commander
+import copy
+
+from pr2_controllers_msgs.msg import Pr2GripperCommand
 
 from calibrateBase import baseMove
 
@@ -103,6 +106,17 @@ class PR2AmazonChallengePlugin(Plugin):
         self._bm.setLinearGain(0.4)
         self._bm.setAngularGain(1)
 
+        self._l_gripper_pub = rospy.Publisher('/l_gripper_controller/command', Pr2GripperCommand)
+
+        self._tool_size = rospy.get_param('/tool_size', [0.16, 0.02, 0.04])
+        self._contest = rospy.get_param('/contest', True)
+        self._item = ''
+
+        if self._contest:
+            self._length_tool = 0.18 + self._tool_size[0]
+        else:
+            self._length_tool = 0.216 + self._tool_size[0]
+
         # button click callbacks
         self._widget.l_arm_start_pos_button.clicked[bool].connect(self._handle_l_arm_start_pos_button_clicked)
         self._widget.l_arm_row_1_pos_button.clicked[bool].connect(self._handle_l_arm_row_1_pos_button_clicked)
@@ -136,6 +150,11 @@ class PR2AmazonChallengePlugin(Plugin):
 
 
         self._widget.arms_start_pos_button.clicked[bool].connect(self._handle_arms_start_pos_button_clicked)
+
+        self._widget.drop_button.clicked[bool].connect(self._handle_drop_button_clicked)
+        self._widget.drop_cheezit_button.clicked[bool].connect(self._handle_drop_cheezit_button_clicked)
+        self._widget.drop_oreo_button.clicked[bool].connect(self._handle_drop_oreo_button_clicked)
+
 
         self._widget.pc_perception_button.clicked[bool].connect(self._handle_pc_perception_button_clicked)
         self._widget.detector_button.clicked[bool].connect(self._handle_detector_button_clicked)
@@ -403,6 +422,108 @@ class PR2AmazonChallengePlugin(Plugin):
 
         self._head.set_joint_value_target(head_pos_goal)
         self._head.go()
+
+
+    def _handle_drop_button_clicked(self):
+        rospy.loginfo('[GUI]: going to drop object')
+        base_pos_dict = rospy.get_param('/base_pos_dict')
+        torso_joint_pos_dict = rospy.get_param('/torso_joint_pos_dict')
+        left_arm_joint_pos_dict = rospy.get_param('/left_arm_joint_pos_dict')
+        dropping_height = rospy.get_param('/dropping_height', 0.255)
+
+        # move to the right
+        base_pos_goal = base_pos_dict['drop']['move_right']
+        self._bm.goAngle(base_pos_goal[5])
+        self._bm.goPosition(base_pos_goal[0:2])
+        self._bm.goAngle(base_pos_goal[5])
+
+        # retreat
+        base_pos_goal = base_pos_dict['drop']['retreat'+self._item]
+        self._bm.goAngle(base_pos_goal[5])
+        self._bm.goPosition(base_pos_goal[0:2])
+        self._bm.goAngle(base_pos_goal[5])
+
+        # torso to drop position
+        joint_pos_goal = torso_joint_pos_dict['drop']
+
+        self._torso.set_joint_value_target(joint_pos_goal)
+        self._torso.go()
+
+        # move left arm to drop position
+        joint_pos_goal = left_arm_joint_pos_dict['drop']
+
+        self._left_arm.set_joint_value_target(joint_pos_goal)
+        self._left_arm.go()
+
+        # move base to the left towards the bin
+        move_base_y = base_pos_dict['drop']['move_left_y']
+        base_pos_goal[1] = move_base_y
+
+        rospy.loginfo('[dropping_server]: moving base left towards the bin')
+        self._bm.goAngle(base_pos_goal[5])
+        self._bm.goPosition(base_pos_goal[0:2])
+        self._bm.goAngle(base_pos_goal[5])
+
+        ######################################
+        # move left arm down
+        # calculate how much to go down
+        z_init = copy.deepcopy(self._left_arm.get_current_pose().pose.position.z)
+
+        z_desired = dropping_height # maximum 30 cm dropping height
+        waypoints = []
+
+        #waypoints.append(self._left_arm.get_current_pose().pose)
+
+        wpose = copy.deepcopy(self._left_arm.get_current_pose().pose)
+        wpose.position.z = z_desired + self._length_tool
+
+        waypoints.append(copy.deepcopy(wpose))
+
+        (plan, fraction) = self._left_arm.compute_cartesian_path(waypoints, 0.005, 0.0)
+
+        self._left_arm.execute(plan)
+
+        ######################################
+        # release gripper
+        gripper_command_msg = Pr2GripperCommand()
+        gripper_command_msg.max_effort = 40.0
+        gripper_command_msg.position = 10.0
+
+        self._l_gripper_pub.publish(gripper_command_msg)
+        t_init = rospy.Time.now()
+
+        r = rospy.Rate(1.0)
+
+        while (rospy.Time.now()-t_init).to_sec() < 5.0 and not rospy.is_shutdown():
+            r.sleep()
+
+        ######################################
+        # move left arm up
+        # calculate how much to go up
+
+        z_desired = z_init # maximum 30 cm dropping height
+        waypoints = []
+
+        #waypoints.append(self._left_arm.get_current_pose().pose)
+
+        wpose = copy.deepcopy(self._left_arm.get_current_pose().pose)
+        wpose.position.z = z_desired + self._length_tool
+
+        waypoints.append(copy.deepcopy(wpose))
+
+        (plan, fraction) = self._left_arm.compute_cartesian_path(waypoints, 0.005, 0.0)
+
+        self._left_arm.execute(plan)
+        self._item = ''
+
+
+    def _handle_drop_cheezit_button_clicked(self):
+        self._item = '_cheezit_big_original'
+        self._handle_drop_button_clicked()
+
+    def _handle_drop_oreo_button_clicked(self):
+        self._item = '_oreo_mega_stuf'
+        self._handle_drop_button_clicked()
 
 
 
