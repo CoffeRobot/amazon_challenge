@@ -48,6 +48,9 @@ struct SegmentPose {
 
   SegmentPose(tf::Vector3 c, tf::Quaternion q, float w, float h, float d)
       : centroid(c), rotation(q), width(w), height(h), depth(d) {}
+
+  SegmentPose()
+    : centroid(), rotation(), width(0), height(0), depth(0){}
 };
 
 class CloudSegmenter {
