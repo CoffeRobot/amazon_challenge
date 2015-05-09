@@ -39,6 +39,7 @@
 // Services
 #include <laser_assembler/AssembleScans2.h>
 #include <vision/ReceiveCloud.h>
+#include <vision/StartAggregator.h>
 #include <simtrack_nodes/UpdateValidationPointCloud.h>
 #include <pr2_msgs/SetPeriodicCmd.h>
 #include <pr2_msgs/SetLaserTrajCmd.h>
@@ -102,6 +103,12 @@ class PeriodicCloudPublisher {
     m_sync_rgbd->registerCallback(boost::bind(&PeriodicCloudPublisher::rgbdCallback, this, _1, _2, _3));
 
 
+
+
+    m_service_server = m_nh.advertiseService(
+        "aggregate_cloud", &PeriodicCloudPublisher::serviceCallback, this);
+
+
     /*
      * m_rgb_filter.subscribe(
          m_nh, "/head_mount_kinect/rgb/image_rect_color/compressed", 1);
@@ -158,6 +165,49 @@ class PeriodicCloudPublisher {
       default:
         break;
     }
+  }
+
+  bool serviceCallback(vision::StartAggregator::Request &req,
+                       vision::StartAggregator::Response &res)
+  {
+    ROS_INFO("Start Aggregating");
+
+    startTiltScanner();
+
+    m_build_aggregated_cloud = true;
+    m_laser_request_start = ros::Time::now();
+
+    ROS_INFO("Aggregating...");
+
+    while (!m_aggregated_cloud_ready) {
+        ros::spinOnce();
+        //ROS_INFO("spinngin once");
+      // check that preempt has not been requested by the client
+
+    }
+
+    auto elapsed = (ros::Time::now() - m_laser_request_start).toSec();
+    stringstream ss;
+    ss << "CB: Cloud built in: " << elapsed << " secs";
+
+    // building the clouds
+    ROS_INFO(ss.str().c_str());
+    sensor_msgs::PointCloud2 out_msg, shelf_msg, bin_msg;
+    pcl::toROSMsg(m_aggregated_cloud, out_msg);
+    pcl::toROSMsg(*m_bin_cloud, bin_msg);
+    pcl::toROSMsg(*m_shelf_cloud, shelf_msg);
+
+    // notify segmentation and tracking
+    notifySegmentation(bin_msg);
+    notifyTracker(out_msg);
+    m_aggregated_cloud_ready = false;
+    m_build_aggregated_cloud = false;
+    stopTiltScanner();
+
+    res.result = true;
+
+    return true;
+
   }
 
   void executeCB(const vision::BTGoalConstPtr& goal) {
@@ -237,7 +287,7 @@ class PeriodicCloudPublisher {
       return true;
     }
     catch (tf::TransformException& ex) {
-      ROS_ERROR("Error in getting the transform of type %s", ex.what());
+//      ROS_ERROR("Error in getting the transform of type %s", ex.what());
       return false;
     }
   }
@@ -265,11 +315,11 @@ class PeriodicCloudPublisher {
   void startTiltScanner() {
 
     tf::Vector3 scanner_origin, bin_origin;
-    if (!getTransformOrigin("laser_tilt_link", scanner_origin)) {
-      return;
-    }
-    if (!getTransformOrigin("shelf_" + m_bin_name, bin_origin)) {
-      return;
+
+    while(!getTransformOrigin("laser_tilt_link", scanner_origin)||
+                    !getTransformOrigin("shelf_" + m_bin_name, bin_origin))
+    {
+            ros::Duration(0.1).sleep();
     }
 
     float z_shelf_laser = scanner_origin.z();
@@ -290,6 +340,11 @@ class PeriodicCloudPublisher {
                          pow((bin_up_x - scanner_origin.x()), 2));
     float d_bottom_h = sqrt(pow((bin_low_z - scanner_origin.z()), 2) +
                             pow((bin_low_x - scanner_origin.x()), 2));
+
+    stringstream d_ss;
+    d_ss << "LS measures: laser_z " << z_shelf_laser << " bin_origin " << bin_origin.z() << " z_top " << d_top << " z_bottom " << d_bottom << "\n"
+         << " d_top_h " << d_top_h << " d_bottom_h " << d_bottom_h;
+    ROS_INFO(d_ss.str().c_str());
 
     double start = asin(d_top / d_top_h);
     double stop = asin(d_bottom / d_bottom_h);
@@ -497,14 +552,21 @@ class PeriodicCloudPublisher {
   void depthCallback(const sensor_msgs::ImageConstPtr& depth_msg) {
 
     if (!m_build_aggregated_cloud) {
-      // ROS_INFO("Kinect: Aggregated cloud not requested!");
+      //ROS_INFO("Kinect: Aggregated cloud not requested!");
       return;
     }
+
+
+    //ROS_INFO("Kinect depth received");
 
     auto elapsed = chrono::duration_cast<chrono::milliseconds>(
         chrono::system_clock::now() - m_kinect_last_received).count();
 
-    if (static_cast<float>(elapsed) < m_kinect_timeout_ms) return;
+    if (static_cast<float>(elapsed) < m_kinect_timeout_ms)
+    {
+        //ROS_INFO("Kinect: timeout!");
+        return;
+    }
     m_kinect_last_received = chrono::system_clock::now();
 
     ROS_INFO("Kinect depth received");
@@ -518,7 +580,10 @@ class PeriodicCloudPublisher {
       m_mutex.unlock();
       // ROS_INFO("Mutex unlocked by kinect");
     } else
+    {
+        ROS_INFO("Kinect: lock!");
       return;
+    }
   }
 
   void taskmanagerCallback(const std_msgs::String::ConstPtr& msg) {
@@ -714,7 +779,7 @@ class PeriodicCloudPublisher {
     float filter_offset = 0.02;
     min_x = 0.04;
     min_y = 0.02;
-    min_z = 0.02;
+    min_z = 0.00;
     max_x = size.x() - filter_offset;
     max_y = size.y() - filter_offset;
     max_z = size.z() - filter_offset;
@@ -802,6 +867,8 @@ class PeriodicCloudPublisher {
   std::atomic_bool m_build_aggregated_cloud, m_aggregated_cloud_ready;
 
   ros::Publisher m_shelf_marker_pub, m_bin_marker_pub;
+
+  ros::ServiceServer m_service_server;
 
  protected:
   ros::NodeHandle m_nh;

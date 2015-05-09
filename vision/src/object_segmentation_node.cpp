@@ -34,6 +34,7 @@
 #include <atomic>
 #include <../include/objectsegmentation.h>
 
+
 using namespace std;
 
 namespace amazon_challenge {
@@ -80,13 +81,15 @@ class CloudSegmenter {
     pcl::fromROSMsg(req.cloud, m_cloud);
     ss << m_cloud.points.size();
     ROS_INFO(ss.str().c_str());
-    res.result = true;
+
     m_mutex.unlock();
-    m_segmentation_request = true;
     pcl::copyPointCloud(m_cloud, m_cloud_colour);
+    m_segmentation_request = true;
+    m_segmentation_ready = false;
 
-    // pcl::io::savePCDFileASCII("test_pcd.pcd", m_cloud);
+    segmentCloud();
 
+    res.result = true;
     return true;
   }
 
@@ -179,9 +182,15 @@ class CloudSegmenter {
   }
 
   void segmentCloud() {
+    ROS_INFO("Segmenting.0");
+
     if (m_cloud.points.size() == 0) return;
 
+    //ROS_INFO("Segmenting.1");
+
     if (m_segmentation_request) {
+       ROS_INFO("Segmenting...");
+
       pcl::PointCloud<pcl::PointXYZ> plane_cloud, filter_cloud;
       vector<pcl::PointCloud<pcl::PointXYZ>> clusters;
       ObjectSegmentation os;
@@ -200,6 +209,8 @@ class CloudSegmenter {
                                    rotation.w());
         m_cluster_pose.push_back(
             SegmentPose(tf_centroid, tf_rotation, w, h, d));
+
+        m_segmentation_ready = true;
       }
 
       stringstream ss;
@@ -242,11 +253,24 @@ class CloudSegmenter {
 
   void publishTFPose() {
 
+  //stringstream d_ss;
+  //d_ss << "TF POSE: num_obj " << m_bin_items.size() << " " << m_cluster_pose.size();
+  //ROS_INFO(d_ss.str().c_str());
 
     if(m_cluster_pose.size() < 1)
         return;
 
-    for (auto i = 0; i < m_bin_items.size(); ++i) {
+    tf::Vector3 &centroid = m_cluster_pose[0].centroid;
+    tf::Quaternion &rotation = m_cluster_pose[0].rotation;
+
+    tf::Transform transform;
+    transform.setOrigin(centroid);
+    transform.setRotation(rotation);
+
+
+    m_tf_broadcaster.sendTransform(tf::StampedTransform(
+                  transform, ros::Time::now(), "base_footprint", m_obj_name));
+    /*for (auto i = 0; i < m_bin_items.size(); ++i) {
 
 
       if(m_cluster_pose.size() < i)
@@ -258,14 +282,11 @@ class CloudSegmenter {
           transform.setOrigin(centroid);
           transform.setRotation(rotation);
 
-          stringstream ss;
-          ss << m_bin_items[i] << "_seg";
 
-
-          m_tf_broadcaster.sendTransform(tf::StampedTransform(
-              transform, ros::Time::now(), "base_footprint", ss.str()));
+          //m_tf_broadcaster.sendTransform(tf::StampedTransform(
+          //    transform, ros::Time::now(), "base_footprint", ss.str()));
       }
-    }
+    }*/
   }
 
  private:
@@ -396,6 +417,7 @@ class CloudSegmenter {
   vector<pcl::PointCloud<pcl::PointXYZ>> m_found_clusters;
   vector<SegmentPose> m_cluster_pose;
   atomic_bool m_segmentation_request;
+  atomic_bool m_segmentation_ready;
 
   string m_bin_name;
   string m_obj_name;
@@ -410,7 +432,7 @@ int main(int argc, char **argv) {
 
   ros::Rate r(100);
   while (ros::ok()) {
-    cs.segmentCloud();
+    //cs.segmentCloud();
     //cs.publishMarkers();
     cs.publishTFPose();
     ros::spinOnce();
