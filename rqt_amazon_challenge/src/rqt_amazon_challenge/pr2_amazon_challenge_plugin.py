@@ -100,11 +100,13 @@ class PR2AmazonChallengePlugin(Plugin):
                 pass
 
 
+        # get base_move parameters
+        base_move_params = rospy.get_param('/base_move')
         self._bm = baseMove.baseMove(verbose=False)
-        self._bm.setPosTolerance(0.02)
-        self._bm.setAngTolerance(0.006)
-        self._bm.setLinearGain(0.4)
-        self._bm.setAngularGain(1)
+        self._bm.setPosTolerance(base_move_params['pos_tolerance'])
+        self._bm.setAngTolerance(base_move_params['ang_tolerance'])
+        self._bm.setLinearGain(base_move_params['linear_gain'])
+        self._bm.setAngularGain(base_move_params['angular_gain'])
 
         self._l_gripper_pub = rospy.Publisher('/l_gripper_controller/command', Pr2GripperCommand)
 
