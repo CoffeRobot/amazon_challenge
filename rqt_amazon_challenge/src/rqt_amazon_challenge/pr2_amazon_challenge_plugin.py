@@ -301,7 +301,7 @@ class PR2AmazonChallengePlugin(Plugin):
     def _handle_torso_row_1_pos_button_clicked(self):
         rospy.loginfo('[GUI]: torso row 1 pos')
         torso_joint_pos_dict = rospy.get_param('/torso_joint_pos_dict')
-        joint_pos_goal = torso_joint_pos_dict['row_1']
+        joint_pos_goal = torso_joint_pos_dict[self._mode]['row_1']
 
         self._torso.set_joint_value_target(joint_pos_goal)
         self._torso.go()
@@ -309,7 +309,7 @@ class PR2AmazonChallengePlugin(Plugin):
     def _handle_torso_row_2_pos_button_clicked(self):
         rospy.loginfo('[GUI]: torso row 2 pos')
         torso_joint_pos_dict = rospy.get_param('/torso_joint_pos_dict')
-        joint_pos_goal = torso_joint_pos_dict['row_2']
+        joint_pos_goal = torso_joint_pos_dict[self._mode]['row_2']
 
         self._torso.set_joint_value_target(joint_pos_goal)
         self._torso.go()
@@ -317,7 +317,7 @@ class PR2AmazonChallengePlugin(Plugin):
     def _handle_torso_row_3_pos_button_clicked(self):
         rospy.loginfo('[GUI]: torso row 3 pos')
         torso_joint_pos_dict = rospy.get_param('/torso_joint_pos_dict')
-        joint_pos_goal = torso_joint_pos_dict['row_3']
+        joint_pos_goal = torso_joint_pos_dict[self._mode]['row_3']
 
         self._torso.set_joint_value_target(joint_pos_goal)
         self._torso.go()
@@ -326,7 +326,7 @@ class PR2AmazonChallengePlugin(Plugin):
     def _handle_torso_row_4_pos_button_clicked(self):
         rospy.loginfo('[GUI]: torso row 4 pos')
         torso_joint_pos_dict = rospy.get_param('/torso_joint_pos_dict')
-        joint_pos_goal = torso_joint_pos_dict['row_4']
+        joint_pos_goal = torso_joint_pos_dict[self._mode]['row_4']
 
         self._torso.set_joint_value_target(joint_pos_goal)
         self._torso.go()
