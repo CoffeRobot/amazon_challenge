@@ -32,11 +32,11 @@ add_action_files(
 
 add_service_files(
   DIRECTORY srv
-  FILES ReceiveCloud.srv
+  FILES ReceiveCloud.srv StartAggregator.srv
 )
 
 generate_messages(
-  DEPENDENCIES actionlib_msgs std_msgs  sensor_msgs# Or other packages containing msgs
+  DEPENDENCIES actionlib_msgs std_msgs sensor_msgs# Or other packages containing msgs
 )
 
 catkin_package(
@@ -147,6 +147,7 @@ target_link_libraries(segmentation_test_client
   ${catkin_LIBRARIES}
   ${OpenCV_LIBS}
   ${PCL_LIBRARIES}
+  ${OpenCV_LIBS}
 )
 
 #add_executable(cloud_publisher
