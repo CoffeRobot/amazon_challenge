@@ -320,6 +320,7 @@ class CloudSegmenter {
   void publishClusters() {
     if(m_cloud_colour.points.size() > 0)
     {
+        m_cloud_colour.header.frame_id = m_cloud.header.frame_id;
         sensor_msgs::PointCloud2 cloud;
         pcl::toROSMsg(m_cloud_colour, cloud);
         m_segmentation_pub.publish(cloud);
