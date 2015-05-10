@@ -732,7 +732,9 @@ class PR2AmazonChallengePlugin(Plugin):
     def _handle_start_bt_button_clicked(self):
         rospy.loginfo('[GUI]: start bt button clicked')
         rospy.loginfo('[GUI]: waiting for /kick_ass service')
-        rospy.wait_for_service('/kick_ass')
+        if not rospy.wait_for_service('/kick_ass', timeout=20):
+            rospy.logerr('[GUI]: timed out waiting for BT service /kick_ass')
+            return
         srv = rospy.ServiceProxy('/kick_ass', Empty)
 
         rospy.loginfo('[GUI]: BT started!!!')
