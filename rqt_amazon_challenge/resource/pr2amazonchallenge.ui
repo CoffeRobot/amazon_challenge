@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>640</width>
-    <height>708</height>
+    <height>826</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -252,7 +252,7 @@
     <property name="geometry">
      <rect>
       <x>30</x>
-      <y>550</y>
+      <y>540</y>
       <width>281</width>
       <height>81</height>
      </rect>
@@ -333,7 +333,7 @@
     <property name="geometry">
      <rect>
       <x>350</x>
-      <y>540</y>
+      <y>530</y>
       <width>66</width>
       <height>17</height>
      </rect>
@@ -346,7 +346,7 @@
     <property name="geometry">
      <rect>
       <x>350</x>
-      <y>580</y>
+      <y>570</y>
       <width>98</width>
       <height>27</height>
      </rect>
@@ -547,6 +547,19 @@
       <string>drop_oreo</string>
      </property>
     </widget>
+   </widget>
+   <widget class="QPushButton" name="start_bt_button">
+    <property name="geometry">
+     <rect>
+      <x>30</x>
+      <y>660</y>
+      <width>281</width>
+      <height>81</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Start behavior tree</string>
+    </property>
    </widget>
   </widget>
   <widget class="QToolBar" name="mainToolBar">
