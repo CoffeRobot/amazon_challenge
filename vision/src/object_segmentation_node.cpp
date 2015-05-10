@@ -82,7 +82,7 @@ class CloudSegmenter {
     ROS_INFO(ss.str().c_str());
 
     m_mutex.unlock();
-    pcl::copyPointCloud(m_cloud, m_cloud_colour);
+    //pcl::copyPointCloud(m_cloud, m_cloud_colour);
     m_segmentation_request = true;
     m_segmentation_ready = false;
 
@@ -216,6 +216,35 @@ class CloudSegmenter {
     }
     ss << " height filter " << count;
 
+    pcl::PointCloud<pcl::PointXYZRGB> cluster_cloud;
+    //pcl::copyPointCloud(m_cloud, m_cloud_colour);
+
+    default_random_engine rde;
+    uniform_int_distribution<int> distribution(0, 255);
+
+
+    for(auto i = 0; i < m_valid_cluster.size(); i++)
+    {
+        if(m_valid_cluster[i])
+        {
+            pcl::PointCloud<pcl::PointXYZRGB> cluster_rgb;
+            pcl::copyPointCloud(m_found_clusters[i], cluster_rgb);
+
+            for(auto j = 0; j < cluster_rgb.points.size(); ++j)
+            {
+                pcl::PointXYZRGB& pt = cluster_rgb.points[j];
+                pt.r = distribution(rde);
+                pt.g = distribution(rde);
+                pt.b = distribution(rde);
+            }
+
+            cluster_cloud += cluster_rgb;
+        }
+    }
+
+
+    m_cloud_colour = cluster_cloud;
+
     ROS_INFO(ss.str().c_str());
 
     m_segmentation_request = false;
@@ -288,6 +317,15 @@ class CloudSegmenter {
     }
   }
 
+  void publishClusters() {
+    if(m_cloud_colour.points.size() > 0)
+    {
+        sensor_msgs::PointCloud2 cloud;
+        pcl::toROSMsg(m_cloud_colour, cloud);
+        m_segmentation_pub.publish(cloud);
+    }
+  }
+
  private:
   void extractPose(const pcl::PointCloud<pcl::PointXYZ> &in_cloud,
                    Eigen::Vector4f &centroid, Eigen::Quaternionf &rotation) {
@@ -327,6 +365,8 @@ class CloudSegmenter {
     pcl::toROSMsg(in_cloud, cloud);
     m_segmentation_pub.publish(cloud);
   }
+
+
 
   visualization_msgs::Marker mark_cluster(
       pcl::PointCloud<pcl::PointXYZ> &cloud_cluster, std::string ns, int id,
@@ -435,6 +475,7 @@ int main(int argc, char **argv) {
     // cs.segmentCloud();
     // cs.publishMarkers();
     cs.publishTFPose();
+    cs.publishClusters();
     ros::spinOnce();
     r.sleep();
   }
