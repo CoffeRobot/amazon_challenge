@@ -280,6 +280,16 @@ class PeriodicCloudPublisher {
     tf::StampedTransform transform;
     string target_frame = "base_footprint";
 
+    try {
+      m_tf_listener->lookupTransform(target_frame, dest_frame, ros::Time(0),
+                                     transform);
+      origin = transform.getOrigin();
+      return true;
+    }
+    catch (tf::TransformException& ex) {
+        return false;
+    }
+
 
   }
 
@@ -307,9 +317,10 @@ class PeriodicCloudPublisher {
 
     tf::Vector3 scanner_origin, bin_origin;
 
-    while(!getTransformOrigin("laser_tilt_link", scanner_origin)||
-                    !getTransformOrigin("shelf_" + m_bin_name, bin_origin))
+    while(!getTransformOrigin("laser_tilt_link", scanner_origin) ||
+          !getTransformOrigin("shelf_" + m_bin_name, bin_origin))
     {
+        ROS_INFO("stuck waiting for tf");
             ros::Duration(0.1).sleep();
     }
 
