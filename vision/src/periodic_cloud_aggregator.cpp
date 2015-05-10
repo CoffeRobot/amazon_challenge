@@ -280,16 +280,7 @@ class PeriodicCloudPublisher {
     tf::StampedTransform transform;
     string target_frame = "base_footprint";
 
-    try {
-      m_tf_listener->lookupTransform(target_frame, dest_frame, ros::Time(0),
-                                     transform);
-      origin = transform.getOrigin();
-      return true;
-    }
-    catch (tf::TransformException& ex) {
-//      ROS_ERROR("Error in getting the transform of type %s", ex.what());
-      return false;
-    }
+
   }
 
   void stopTiltScanner() {

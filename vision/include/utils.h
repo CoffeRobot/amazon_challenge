@@ -12,6 +12,7 @@
 #include <pcl/point_types.h>
 #include <eigen3/Eigen/Geometry>
 #include <tf/transform_datatypes.h>
+#include <tf/transform_listener.h>
 
 namespace amazon_challenge {
 
@@ -101,72 +102,76 @@ void depthToCloud(const sensor_msgs::ImageConstPtr& depth_msg,
   }
 }
 
-Eigen::Vector3f getBinSize(std::string bin_name)
-{
-    if(bin_name.compare("bin_A") == 0 || bin_name.compare("bin_C") == 0 ||
-       bin_name.compare("bin_J") == 0 || bin_name.compare("bin_L") == 0)
-    {
-        return Eigen::Vector3f(0.42,0.27,0.24);
-    }
-    else if(bin_name.compare("bin_D") == 0 || bin_name.compare("bin_F") == 0 ||
-            bin_name.compare("bin_G") == 0 || bin_name.compare("bin_I") == 0)
-    {
-        return Eigen::Vector3f(0.42,0.27,0.22);
-    }
-    else if(bin_name.compare("bin_B") == 0 || bin_name.compare("bin_K") == 0)
-    {
-        return Eigen::Vector3f(0.42,0.30,0.22);
-    }
-    else
-    {
-        return Eigen::Vector3f(0.42,0.30,0.24);
-    }
+Eigen::Vector3f getBinSize(std::string bin_name) {
+  if (bin_name.compare("bin_A") == 0 || bin_name.compare("bin_C") == 0 ||
+      bin_name.compare("bin_J") == 0 || bin_name.compare("bin_L") == 0) {
+    return Eigen::Vector3f(0.42, 0.27, 0.24);
+  } else if (bin_name.compare("bin_D") == 0 || bin_name.compare("bin_F") == 0 ||
+             bin_name.compare("bin_G") == 0 || bin_name.compare("bin_I") == 0) {
+    return Eigen::Vector3f(0.42, 0.27, 0.22);
+  } else if (bin_name.compare("bin_B") == 0 || bin_name.compare("bin_K") == 0) {
+    return Eigen::Vector3f(0.42, 0.30, 0.22);
+  } else {
+    return Eigen::Vector3f(0.42, 0.30, 0.24);
+  }
 }
 
-Eigen::Vector3f getBinColor(std::string bin_name)
-{
-    if(bin_name.compare("bin_A") == 0) return Eigen::Vector3f(255,0,0);
-    if(bin_name.compare("bin_B") == 0) return Eigen::Vector3f(255,0,127);
-    if(bin_name.compare("bin_C") == 0) return Eigen::Vector3f(255,0,255);
-    if(bin_name.compare("bin_D") == 0) return Eigen::Vector3f(170,85,0);
-    if(bin_name.compare("bin_E") == 0) return Eigen::Vector3f(170,42,127);
-    if(bin_name.compare("bin_F") == 0) return Eigen::Vector3f(170,0,255);
-    if(bin_name.compare("bin_G") == 0) return Eigen::Vector3f(85,170,0);
-    if(bin_name.compare("bin_H") == 0) return Eigen::Vector3f(85,85,127);
-    if(bin_name.compare("bin_I") == 0) return Eigen::Vector3f(85,0,255);
-    if(bin_name.compare("bin_J") == 0) return Eigen::Vector3f(0,255,0);
-    if(bin_name.compare("bin_K") == 0) return Eigen::Vector3f(0,127,127);
-    if(bin_name.compare("bin_L") == 0) return Eigen::Vector3f(0,0,255);
+Eigen::Vector3f getBinColor(std::string bin_name) {
+  if (bin_name.compare("bin_A") == 0) return Eigen::Vector3f(255, 0, 0);
+  if (bin_name.compare("bin_B") == 0) return Eigen::Vector3f(255, 0, 127);
+  if (bin_name.compare("bin_C") == 0) return Eigen::Vector3f(255, 0, 255);
+  if (bin_name.compare("bin_D") == 0) return Eigen::Vector3f(170, 85, 0);
+  if (bin_name.compare("bin_E") == 0) return Eigen::Vector3f(170, 42, 127);
+  if (bin_name.compare("bin_F") == 0) return Eigen::Vector3f(170, 0, 255);
+  if (bin_name.compare("bin_G") == 0) return Eigen::Vector3f(85, 170, 0);
+  if (bin_name.compare("bin_H") == 0) return Eigen::Vector3f(85, 85, 127);
+  if (bin_name.compare("bin_I") == 0) return Eigen::Vector3f(85, 0, 255);
+  if (bin_name.compare("bin_J") == 0) return Eigen::Vector3f(0, 255, 0);
+  if (bin_name.compare("bin_K") == 0) return Eigen::Vector3f(0, 127, 127);
+  if (bin_name.compare("bin_L") == 0) return Eigen::Vector3f(0, 0, 255);
 }
-
 
 void colorCloudWithBin(std::string bin_name, tf::Vector3& origin,
-                       pcl::PointCloud<pcl::PointXYZRGB>& out_cloud)
-{
-    auto size = getBinSize(bin_name);
-    auto color = getBinColor(bin_name);
+                       pcl::PointCloud<pcl::PointXYZRGB>& out_cloud) {
+  auto size = getBinSize(bin_name);
+  auto color = getBinColor(bin_name);
 
-    float min_x = origin.x();
-    float max_x = min_x + size.x();
+  float min_x = origin.x();
+  float max_x = min_x + size.x();
 
-    float min_y = origin.y();
-    float max_y = min_y + size.y();
+  float min_y = origin.y();
+  float max_y = min_y + size.y();
 
-    float min_z = origin.z();
-    float max_z = min_z + size.z();
+  float min_z = origin.z();
+  float max_z = min_z + size.z();
 
-    for(auto pt : out_cloud.points)
-    {
-        if(pt.x >= min_x && pt.x < max_x && pt.y > min_y && pt.y < max_y &&
-           pt.z >= min_z && pt.z < max_z)
-        {
-            pt.r = color.x();
-            pt.g = color.y();
-            pt.b = color.z();
-        }
+  for (auto pt : out_cloud.points) {
+    if (pt.x >= min_x && pt.x < max_x && pt.y > min_y && pt.y < max_y &&
+        pt.z >= min_z && pt.z < max_z) {
+      pt.r = color.x();
+      pt.g = color.y();
+      pt.b = color.z();
     }
+  }
 }
 
+bool getTimedTransform(const tf::TransformListener& listener,
+                       std::string target_frame, std::string dest_frame,
+                       float sec, tf::StampedTransform& transform)
+{
+    ros::Time begin = ros::Time::now();
+    while((ros::Time::now() - begin).toSec() < sec)
+    {
+        try {
+          listener.lookupTransform(target_frame, dest_frame, ros::Time(0),
+                                         transform);
+          return true;
+        }
+        catch (tf::TransformException& ex) {
+        }
+    }
+    return false;
+}
 
 }  // end namespace
 

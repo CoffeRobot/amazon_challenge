@@ -1,208 +1,174 @@
-#include <iostream>
-#include <vector>
-#include <string>
-#include <ros/ros.h>
+#include "ros/ros.h"
+#include "tf/transform_listener.h"
+#include "sensor_msgs/PointCloud.h"
+#include "tf/message_filter.h"
+#include "message_filters/subscriber.h"
+#include "laser_geometry/laser_geometry.h"
 #include <pcl_ros/point_cloud.h>
-#include "pcl_ros/transforms.h"
-#include <pcl/point_types.h>
-#include <pcl/io/io.h>
+#include <pcl_ros/transforms.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl/visualization/cloud_viewer.h>
-#include <iostream>
-#include <pcl/io/pcd_io.h>
-#include <pcl/point_types.h>
 #include <pcl/PCLPointCloud2.h>
-#include <memory>
-#include <tf/transform_listener.h>
-#include <cstdlib>
-#include <tf_conversions/tf_eigen.h>
-#include <Eigen/Geometry>
 #include <pcl/filters/passthrough.h>
-#include <pcl/common/pca.h>
-#include <eigen3/Eigen/Core>
-#include <eigen3/Eigen/Geometry>
+#include <pcl/point_types.h>
 #include <pcl/common/common.h>
-#include "../include/objectsegmentation.h"
+#include <sensor_msgs/CameraInfo.h>
+#include <sensor_msgs/PointCloud2.h>
+#include <sensor_msgs/point_cloud_conversion.h>
+#include <sensor_msgs/image_encodings.h>
+#include <image_transport/image_transport.h>
+#include <image_transport/subscriber_filter.h>
+#include <memory>
+#include <chrono>
+#include <sstream>
+#include <mutex>
+#include <image_geometry/pinhole_camera_model.h>
+#include <sensor_msgs/image_encodings.h>
+#include <std_msgs/String.h>
+#include <actionlib/server/simple_action_server.h>
+#include "../include/DepthTraits.h"
+#include "../include/utils.h"
+#include <vision/BTAction.h>
+#include <atomic>
+#include <thread>
+#include <visualization_msgs/Marker.h>
+#include <message_filters/subscriber.h>
+#include <message_filters/time_synchronizer.h>
+#include <message_filters/sync_policies/approximate_time.h>
+#include <cv_bridge/cv_bridge.h>
+#include <opencv2/core/core.hpp>
 
-using namespace pcl;
+// Services
+#include <laser_assembler/AssembleScans2.h>
+#include <vision/ReceiveCloud.h>
+#include <vision/StartAggregator.h>
+#include <simtrack_nodes/UpdateValidationPointCloud.h>
+#include <pr2_msgs/SetPeriodicCmd.h>
+#include <pr2_msgs/SetLaserTrajCmd.h>
+
 using namespace std;
 
-unique_ptr<pcl::visualization::PCLVisualizer> g_viewer;
-PointCloud<PointXYZ>::Ptr g_cloud(new PointCloud<PointXYZ>);
-unique_ptr<tf::TransformListener> g_listener;
-amazon_challenge::ObjectSegmentation segmentation;
-default_random_engine rde;
-uniform_int_distribution<int> distribution(0, 255);
+namespace amazon_challenge {
 
-pcl::PointCloud<PointXYZ>::Ptr g_model_cloud(new PointCloud<PointXYZ>);
-float g_x, g_y, g_z;
+class SegmenterTestClient {
 
-bool g_loaded = false;
+ public:
+  SegmenterTestClient() : m_nh() {
 
-void keyboardEventOccurred(const pcl::visualization::KeyboardEvent& event) {
-  if (event.getKeySym() == "r" && event.keyDown()) {
-    std::cout << "r was pressed" << std::endl;
-  }
-  if (event.getKeySym() == "i" && event.keyUp()) {
-    std::cout << "i was reealsed" << std::endl;
-  }
-}
+    m_depth_it.reset(new image_transport::ImageTransport(m_nh));
+    m_sub_depth.subscribe(
+        *m_depth_it,
+        "/head_mount_kinect/depth_registered/sw_registered/image_rect_raw", 1,
+        image_transport::TransportHints("compressedDepth"));
+    m_rgb_it.reset(new image_transport::ImageTransport(m_nh));
+    m_sub_rgb.subscribe(*m_rgb_it, "/head_mount_kinect/rgb/image_rect_color", 1,
+                        image_transport::TransportHints("compressed"));
+    m_sub_rgb_info.subscribe(m_nh, "/head_mount_kinect/rgb/camera_info", 1);
 
-void updateViewer(
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, string id,
-    pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ>& color) {
-  g_viewer->removePointCloud(id);
-  g_viewer->addPointCloud<pcl::PointXYZ>(cloud, color, id);
-  //
-}
+    m_sync_rgbd.reset(new SynchronizerRGBD(SyncPolicyRGBD(5), m_sub_depth,
+                                           m_sub_rgb, m_sub_rgb_info));
+    m_sync_rgbd->registerCallback(
+        boost::bind(&SegmenterTestClient::rgbdCallback, this, _1, _2, _3));
 
-void createViewer() {
-  g_viewer = unique_ptr<pcl::visualization::PCLVisualizer>(
-      new pcl::visualization::PCLVisualizer("3D Viewer"));
-  g_viewer->setBackgroundColor(0, 0, 0);
-  g_viewer->addCoordinateSystem(1.0);
-  g_viewer->initCameraParameters();
-  // g_viewer->setCameraPosition(0,0,0,1,0,0,0,1,0);
-  g_viewer->registerKeyboardCallback(keyboardEventOccurred);
-}
+    m_cloud_publisher =
+        m_nh.advertise<sensor_msgs::PointCloud2>("segmentation_test_cloud", 1);
+  };
 
-void addRotateBouindgBox(PointCloud<PointXYZ>::Ptr point_cloud_ptr, string id)
-{
-    // compute principal direction
-    Eigen::Vector4f centroid;
-    pcl::compute3DCentroid(*point_cloud_ptr, centroid);
-    Eigen::Matrix3f covariance;
-    computeCovarianceMatrixNormalized(*point_cloud_ptr, centroid, covariance);
-    Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eigen_solver(covariance, Eigen::ComputeEigenvectors);
-    Eigen::Matrix3f eigDx = eigen_solver.eigenvectors();
-    eigDx.col(2) = eigDx.col(0).cross(eigDx.col(1));
+  void rgbdCallback(const sensor_msgs::ImageConstPtr& depth_msg,
+                    const sensor_msgs::ImageConstPtr& rgb_msg,
+                    const sensor_msgs::CameraInfoConstPtr& rgb_info_msg) {
 
-    // move the points to the that reference frame
-    Eigen::Matrix4f p2w(Eigen::Matrix4f::Identity());
-    p2w.block<3,3>(0,0) = eigDx.transpose();
-    p2w.block<3,1>(0,3) = -1.f * (p2w.block<3,3>(0,0) * centroid.head<3>());
-    pcl::PointCloud<PointXYZ> cPoints;
-    pcl::transformPointCloud(*point_cloud_ptr, cPoints, p2w);
+    // ROS_INFO("Received full optional kinect data :)");
 
-    PointXYZ min_pt, max_pt;
-    pcl::getMinMax3D(cPoints, min_pt, max_pt);
-    const Eigen::Vector3f mean_diag = 0.5f*(max_pt.getVector3fMap() + min_pt.getVector3fMap());
+    image_geometry::PinholeCameraModel model;
+    model.fromCameraInfo(rgb_info_msg);
+    sensor_msgs::PointCloud2::Ptr cloud_msg(new sensor_msgs::PointCloud2);
 
-    // final transform
-    const Eigen::Quaternionf qfinal(eigDx);
-    const Eigen::Vector3f tfinal = eigDx*mean_diag + centroid.head<3>();
+    if (depth_msg->encoding == sensor_msgs::image_encodings::TYPE_16UC1) {
+      depthToCloud<uint16_t>(depth_msg, model, *cloud_msg, 0.0);
+    } else if (depth_msg->encoding ==
+               sensor_msgs::image_encodings::TYPE_32FC1) {
+      depthToCloud<float>(depth_msg, model, *cloud_msg, 0.0);
+    } else {
+      ROS_WARN("Warning: unsupported depth image format!");
+      m_mutex.unlock();
+      // ROS_INFO("Mutex unlocked by cloud message");
+      return;
+    }
 
-    g_viewer->addCube(tfinal, qfinal, max_pt.x - min_pt.x, max_pt.y - min_pt.y, max_pt.z - min_pt.z, id);
-}
+    cloud_msg->header.frame_id = rgb_msg->header.frame_id;
 
-void addBoundingBox(PointCloud<PointXYZ>::Ptr& cloud, string id)
-{
-    pcl::ModelCoefficients coeff_cube;
-    Eigen::Vector4f min_pt, max_pt;
-    pcl::getMinMax3D(*cloud, min_pt, max_pt);
+    pcl::PointCloud<pcl::PointXYZ> cloud;
+    pcl::fromROSMsg(*cloud_msg, cloud);
+    pcl::copyPointCloud(cloud, m_colored_cloud);
 
-    coeff_cube.values.resize(10);
-    coeff_cube.values[0] =
-        min_pt.x() + (max_pt.x() - min_pt.x()) / 2;  // Translation along the X axis
-    coeff_cube.values[1] =
-        min_pt.y() + (max_pt.y() - min_pt.y()) / 2;  // Translation along the Y axis
-    coeff_cube.values[2] =
-        min_pt.z() + (max_pt.z() - min_pt.z()) / 2;  // Translation along the Z axis
-    coeff_cube.values[3] = 0;
-    coeff_cube.values[4] = 0;
-    coeff_cube.values[5] = 0;
-    coeff_cube.values[6] = 1;
-    coeff_cube.values[7] = fabs(max_pt.x() - min_pt.x());
-    coeff_cube.values[8] = fabs(max_pt.y() - min_pt.y());
-    coeff_cube.values[9] = fabs(max_pt.z() - min_pt.z());
-    g_viewer->addCube(coeff_cube, id);
-}
+    cv_bridge::CvImageConstPtr cv_ptr;
+    try {
+      cv_ptr = cv_bridge::toCvShare(rgb_msg, sensor_msgs::image_encodings::BGR8);
+    }
+    catch (cv_bridge::Exception& e) {
+      ROS_ERROR("cv_bridge exception: %s", e.what());
+      return;
+    }
 
-void pointCloudCallback(const sensor_msgs::PointCloud2::ConstPtr& msg) {
+    auto w = m_colored_cloud.width;
+    auto h = m_colored_cloud.height;
 
-  // if (g_loaded) return;
+    const cv::Mat& img = cv_ptr->image;
 
-  // sensor_msgs::PointCloud2 out;
-  // pcl_ros::transformPointCloud("base_footprint", *msg, out, *g_listener);
-
-  PointCloud<PointXYZ> cloud;
-  pcl::fromROSMsg(*msg, cloud);
-
-  PointCloud<PointXYZ>::Ptr cloud_ptr = cloud.makeShared();
-
-  pcl::PassThrough<pcl::PointXYZ> pass;
-  pass.setInputCloud(cloud_ptr);
-
-  pass.setFilterFieldName("z");
-  pass.setFilterLimits(0, 1.3);
-  pass.filter(*g_cloud);
-
-  PointCloud<PointXYZ>::Ptr plane(new PointCloud<PointXYZ>());
-  PointCloud<PointXYZ>::Ptr filtered(new PointCloud<PointXYZ>());
-  segmentation.findPlane(*g_cloud, *plane, *filtered);
-
-  pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> plane_color(
-      plane, 0, 255, 0);
-  updateViewer(plane, "plane", plane_color);
-
-  vector<PointCloud<PointXYZ>> clusters;
-  segmentation.clusterComponentsEuclidean(*filtered, clusters);
-
-  g_viewer->removeAllShapes();
-
-  for (auto i = 0; i < clusters.size(); ++i) {
-
-      PointCloud<PointXYZ>::Ptr ptr = clusters[i].makeShared();
-      pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> color(
-          ptr, distribution(rde), distribution(rde), distribution(rde));
-      stringstream ss;
-      ss << "cluster" << i;
-      updateViewer(ptr, ss.str(), color);
-      ss << "cube";
-      addRotateBouindgBox(ptr, ss.str());
-
+    for (auto row = 0; row < h; ++row) {
+      for (auto col = 0; col < w; ++col) {
+        auto id = col + w * row;
+        cv::Vec3b rgb = img.at<cv::Vec3b>(row,col);
+        pcl::PointXYZRGB& p = m_colored_cloud.points[id];
+        p.r = rgb.val[2];
+        p.g = rgb.val[1];
+        p.b = rgb.val[0];
+      }
+    }
   }
 
-  // pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ>
-  // filtered_color(
-  //   filtered, 0, 255, 255);
-  // updateViewer(filtered, "filtered", filtered_color);
-
-  // cloud.header = pcl_conversions::toPCL(msg->header);
-
-  ROS_INFO("Point cloud received!");
-}
-
-void getTransform(tf::TransformListener& listener, std::string target,
-                  std::string dest, tf::StampedTransform& transform) {
-  try {
-    listener.lookupTransform(target, dest, ros::Time(0), transform);
+  void publishCloud() {
+    sensor_msgs::PointCloud2 cloud;
+    pcl::toROSMsg(m_colored_cloud, cloud);
+    m_cloud_publisher.publish(cloud);
   }
-  catch (tf::TransformException& ex) {
-    ROS_ERROR("%s", ex.what());
-  }
-}
+
+  ros::NodeHandle m_nh;
+  boost::shared_ptr<image_transport::ImageTransport> m_rgb_it, m_depth_it;
+  image_transport::SubscriberFilter m_sub_depth, m_sub_rgb;
+  message_filters::Subscriber<sensor_msgs::CameraInfo> m_sub_rgb_info;
+  typedef message_filters::sync_policies::ApproximateTime<
+      sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo>
+      SyncPolicyRGBD;
+  typedef message_filters::Synchronizer<SyncPolicyRGBD> SynchronizerRGBD;
+  boost::shared_ptr<SynchronizerRGBD> m_sync_rgbd;
+
+  std::mutex m_mutex;
+  sensor_msgs::CameraInfo m_camera_info_msg;
+
+  pcl::PointCloud<pcl::PointXYZRGB> m_colored_cloud;
+
+  ros::Publisher m_cloud_publisher;
+
+  tf::TransformListener m_tf_listener;
+};
+
+}  // end namespace
 
 int main(int argc, char** argv) {
-  ros::init(argc, argv, "pcl_listener");
 
-  createViewer();
+  ros::init(argc, argv, "segmentation_test_client");
 
-  ros::NodeHandle nh;
-  ros::Subscriber sub = nh.subscribe<sensor_msgs::PointCloud2>(
-      "/head_mount_kinect/depth/points", 1, pointCloudCallback);
+  amazon_challenge::SegmenterTestClient tc;
 
-  tf::TransformListener listener;
-  g_listener = unique_ptr<tf::TransformListener>(new tf::TransformListener());
-  // listener.waitForTransform("ir?kinect", "basefooprint",
+  ros::Rate r(100);
+  while (ros::ok()) {
 
-  while (!g_viewer->wasStopped()) {
-
+    tc.publishCloud();
     ros::spinOnce();
-    g_viewer->spinOnce(1);
+    r.sleep();
   }
 
-  cout << "Or here" << endl;
-  ros::shutdown();
   return 0;
 }

@@ -147,6 +147,7 @@ target_link_libraries(segmentation_test_client
   ${catkin_LIBRARIES}
   ${OpenCV_LIBS}
   ${PCL_LIBRARIES}
+  ${OpenCV_LIBS}
 )
 
 #add_executable(cloud_publisher

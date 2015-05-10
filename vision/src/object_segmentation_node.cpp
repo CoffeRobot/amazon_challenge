@@ -182,14 +182,12 @@ class CloudSegmenter {
   }
 
   void segmentCloud() {
-    ROS_INFO("Segmenting.0");
 
     if (m_cloud.points.size() == 0) return;
 
     //ROS_INFO("Segmenting.1");
 
     if (m_segmentation_request) {
-       ROS_INFO("Segmenting...");
 
       pcl::PointCloud<pcl::PointXYZ> plane_cloud, filter_cloud;
       vector<pcl::PointCloud<pcl::PointXYZ>> clusters;
