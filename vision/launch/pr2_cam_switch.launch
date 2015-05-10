@@ -7,7 +7,7 @@
   <param name="simtrack/model_path" value="$(find vision)/../data/object_models" />
   <rosparam command="load" file="$(find vision)/config/demo_objects.yaml"/>
 
-  <node name="tracker" pkg="simtrack_nodes" type="pr2_cam_switch_tracker_node" output="screen"/>
-  <node name="detector" pkg="simtrack_nodes" type="pr2_cam_switch_detector_node" output="screen"/>
+  <node name="tracker" pkg="simtrack_nodes" type="pr2_cam_switch_tracker_node" output="screen" respawn="true"/>
+  <node name="detector" pkg="simtrack_nodes" type="pr2_cam_switch_detector_node" output="screen" respawn="true"/>
 
 </launch>
