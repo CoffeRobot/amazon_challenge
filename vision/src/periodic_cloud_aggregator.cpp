@@ -280,6 +280,16 @@ class PeriodicCloudPublisher {
     tf::StampedTransform transform;
     string target_frame = "base_footprint";
 
+    try {
+      m_tf_listener->lookupTransform(target_frame, dest_frame, ros::Time(0),
+                               transform);
+      origin = transform.getOrigin();
+      return true;
+    }
+    catch (tf::TransformException& ex) {
+        return false;
+    }
+
 
   }
 
@@ -331,11 +341,6 @@ class PeriodicCloudPublisher {
                          pow((bin_up_x - scanner_origin.x()), 2));
     float d_bottom_h = sqrt(pow((bin_low_z - scanner_origin.z()), 2) +
                             pow((bin_low_x - scanner_origin.x()), 2));
-
-    stringstream d_ss;
-    d_ss << "LS measures: laser_z " << z_shelf_laser << " bin_origin " << bin_origin.z() << " z_top " << d_top << " z_bottom " << d_bottom << "\n"
-         << " d_top_h " << d_top_h << " d_bottom_h " << d_bottom_h;
-    ROS_INFO(d_ss.str().c_str());
 
     double start = asin(d_top / d_top_h);
     double stop = asin(d_bottom / d_bottom_h);

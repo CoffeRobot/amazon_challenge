@@ -13,6 +13,8 @@
 #include <eigen3/Eigen/Geometry>
 #include <tf/transform_datatypes.h>
 #include <tf/transform_listener.h>
+#include <pcl/filters/passthrough.h>
+#include <DepthTraits.h>
 
 namespace amazon_challenge {
 
@@ -116,19 +118,19 @@ Eigen::Vector3f getBinSize(std::string bin_name) {
   }
 }
 
-Eigen::Vector3f getBinColor(std::string bin_name) {
-  if (bin_name.compare("bin_A") == 0) return Eigen::Vector3f(255, 0, 0);
-  if (bin_name.compare("bin_B") == 0) return Eigen::Vector3f(255, 0, 127);
-  if (bin_name.compare("bin_C") == 0) return Eigen::Vector3f(255, 0, 255);
-  if (bin_name.compare("bin_D") == 0) return Eigen::Vector3f(170, 85, 0);
-  if (bin_name.compare("bin_E") == 0) return Eigen::Vector3f(170, 42, 127);
-  if (bin_name.compare("bin_F") == 0) return Eigen::Vector3f(170, 0, 255);
-  if (bin_name.compare("bin_G") == 0) return Eigen::Vector3f(85, 170, 0);
-  if (bin_name.compare("bin_H") == 0) return Eigen::Vector3f(85, 85, 127);
-  if (bin_name.compare("bin_I") == 0) return Eigen::Vector3f(85, 0, 255);
-  if (bin_name.compare("bin_J") == 0) return Eigen::Vector3f(0, 255, 0);
-  if (bin_name.compare("bin_K") == 0) return Eigen::Vector3f(0, 127, 127);
-  if (bin_name.compare("bin_L") == 0) return Eigen::Vector3f(0, 0, 255);
+Eigen::Vector3i getBinColor(std::string bin_name) {
+  if (bin_name.compare("bin_A") == 0) return Eigen::Vector3i(255, 0, 0);
+  if (bin_name.compare("bin_B") == 0) return Eigen::Vector3i(255, 0, 127);
+  if (bin_name.compare("bin_C") == 0) return Eigen::Vector3i(255, 0, 255);
+  if (bin_name.compare("bin_D") == 0) return Eigen::Vector3i(170, 85, 0);
+  if (bin_name.compare("bin_E") == 0) return Eigen::Vector3i(170, 42, 127);
+  if (bin_name.compare("bin_F") == 0) return Eigen::Vector3i(170, 0, 255);
+  if (bin_name.compare("bin_G") == 0) return Eigen::Vector3i(85, 170, 0);
+  if (bin_name.compare("bin_H") == 0) return Eigen::Vector3i(85, 85, 127);
+  if (bin_name.compare("bin_I") == 0) return Eigen::Vector3i(85, 0, 255);
+  if (bin_name.compare("bin_J") == 0) return Eigen::Vector3i(0, 255, 0);
+  if (bin_name.compare("bin_K") == 0) return Eigen::Vector3i(0, 127, 127);
+  if (bin_name.compare("bin_L") == 0) return Eigen::Vector3i(0, 0, 255);
 }
 
 void colorCloudWithBin(std::string bin_name, tf::Vector3& origin,
@@ -155,22 +157,64 @@ void colorCloudWithBin(std::string bin_name, tf::Vector3& origin,
   }
 }
 
+void cropCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_ptr,
+               float min_x, float max_x, float min_y, float max_y, float min_z,
+               float max_z, pcl::PointCloud<pcl::PointXYZ>::Ptr cropped)
+{
+  pcl::PassThrough<pcl::PointXYZ> pass;
+  pass.setInputCloud(cloud_ptr);
+
+  pass.setFilterFieldName("x");
+  pass.setFilterLimits(min_x, max_x);
+  pass.filter(*cropped);
+
+  pass.setInputCloud(cropped);
+  pass.setFilterFieldName("y");
+  pass.setFilterLimits(min_y, max_y);
+  pass.filter(*cropped);
+
+  pass.setInputCloud(cropped);
+  pass.setFilterFieldName("z");
+  pass.setFilterLimits(min_z, max_z);
+  pass.filter(*cropped);
+}
+
+void cropCloud(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_ptr,
+               float min_x, float max_x, float min_y, float max_y, float min_z,
+               float max_z, pcl::PointCloud<pcl::PointXYZRGB>::Ptr cropped)
+{
+  pcl::PassThrough<pcl::PointXYZRGB> pass;
+  pass.setInputCloud(cloud_ptr);
+
+  pass.setFilterFieldName("x");
+  pass.setFilterLimits(min_x, max_x);
+  pass.filter(*cropped);
+
+  pass.setInputCloud(cropped);
+  pass.setFilterFieldName("y");
+  pass.setFilterLimits(min_y, max_y);
+  pass.filter(*cropped);
+
+  pass.setInputCloud(cropped);
+  pass.setFilterFieldName("z");
+  pass.setFilterLimits(min_z, max_z);
+  pass.filter(*cropped);
+}
+
 bool getTimedTransform(const tf::TransformListener& listener,
                        std::string target_frame, std::string dest_frame,
-                       float sec, tf::StampedTransform& transform)
-{
-    ros::Time begin = ros::Time::now();
-    while((ros::Time::now() - begin).toSec() < sec)
-    {
-        try {
-          listener.lookupTransform(target_frame, dest_frame, ros::Time(0),
-                                         transform);
-          return true;
-        }
-        catch (tf::TransformException& ex) {
-        }
+                       float sec, tf::StampedTransform& transform) {
+  ros::Time begin = ros::Time::now();
+  while ((ros::Time::now() - begin).toSec() < sec) {
+    try {
+      listener.lookupTransform(target_frame, dest_frame, ros::Time(0),
+                               transform);
+      return true;
     }
-    return false;
+    catch (tf::TransformException& ex) {
+    }
+  }
+  return false;
 }
 
 }  // end namespace

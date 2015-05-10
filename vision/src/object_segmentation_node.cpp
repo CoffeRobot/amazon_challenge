@@ -33,7 +33,7 @@
 #include <pcl/common/common.h>
 #include <atomic>
 #include <../include/objectsegmentation.h>
-
+#include <../include/utils.h>
 
 using namespace std;
 
@@ -50,8 +50,7 @@ struct SegmentPose {
   SegmentPose(tf::Vector3 c, tf::Quaternion q, float w, float h, float d)
       : centroid(c), rotation(q), width(w), height(h), depth(d) {}
 
-  SegmentPose()
-    : centroid(), rotation(), width(0), height(0), depth(0){}
+  SegmentPose() : centroid(), rotation(), width(0), height(0), depth(0) {}
 };
 
 class CloudSegmenter {
@@ -105,8 +104,7 @@ class CloudSegmenter {
     }
   }
 
-  void binItemsCallback(const std_msgs::String::ConstPtr &msg)
-  {
+  void binItemsCallback(const std_msgs::String::ConstPtr &msg) {
     string num_items_s = "";
     vector<string> items;
     string item = "";
@@ -115,22 +113,18 @@ class CloudSegmenter {
     string s = msg->data;
     string separator = ",";
 
-    for(auto i = 1; i < msg->data.length() - 1; i++)
-    {
-        char c = s[i];
-        if(c != separator[0]  && !num_items_done)
-            num_items_s += c;
-        else if(c == separator[0] && !num_items_done)
-        {
-            num_items_done = true;
-        }
-        else if(c != separator[0] && num_items_done)
-            item += c;
-        else if(c == separator[0] && num_items_done)
-        {
-            items.push_back(item);
-            item = "";
-        }
+    for (auto i = 1; i < msg->data.length() - 1; i++) {
+      char c = s[i];
+      if (c != separator[0] && !num_items_done)
+        num_items_s += c;
+      else if (c == separator[0] && !num_items_done) {
+        num_items_done = true;
+      } else if (c != separator[0] && num_items_done)
+        item += c;
+      else if (c == separator[0] && num_items_done) {
+        items.push_back(item);
+        item = "";
+      }
     }
 
     items.push_back(item);
@@ -138,85 +132,93 @@ class CloudSegmenter {
     m_bin_items = items;
   }
 
-  void filterClusters()
-  {
-    auto num_items = m_bin_items.size();
-    vector<int> invalid_clusters;
+  void filterClustersbySize() {
+    for (auto i = 0; i < m_found_clusters.size(); ++i) {
+      SegmentPose &pose = m_cluster_pose[i];
+      int valid_dimensions = 0;
+      if (pose.width >= 0.02 && pose.width < 0.15) valid_dimensions++;
+      if (pose.height >= 0.02 && pose.height < 0.15) valid_dimensions++;
+      if (pose.depth >= 0.02 && pose.depth < 0.15) valid_dimensions++;
 
-    for(auto i = 0; i < m_found_clusters.size(); ++i)
-    {
-        SegmentPose& pose = m_cluster_pose[i];
-        int valid_dimensions = 0;
-        if(pose.width >= 0.02 && pose.width < 0.15)
-            valid_dimensions++;
-        if(pose.height >= 0.02 && pose.height < 0.15)
-            valid_dimensions++;
-        if(pose.depth >= 0.02 && pose.depth < 0.15)
-            valid_dimensions++;
+      if (valid_dimensions < 2) {
+        m_valid_cluster[i] = false;
+      }
+    }
+  }
 
-        if(valid_dimensions < 2)
-        {
-            invalid_clusters.push_back(i);
-        }
+  void filterClustersByHeight() {
+    tf::StampedTransform transform;
+    string bin_name = "shelf_" + m_bin_name;
+    if (!getTimedTransform(m_tf_listener, "base_footprint", bin_name, 2,
+                           transform)) {
+      ROS_WARN("SEG: tf timeout!");
+      return;
     }
 
-
-    int curr_valid = m_found_clusters.size() -1;
-    for(auto i = invalid_clusters.size(); i >= 0 ; --i)
-    {
-        int invalid_id = invalid_clusters[i];
-        if(invalid_id == curr_valid)
-        {
-            curr_valid--;
-        }
-        else if(invalid_id < curr_valid)
-        {
-            m_found_clusters[invalid_id] = m_found_clusters[curr_valid];
-            m_cluster_pose[invalid_id] = m_cluster_pose[curr_valid];
-            curr_valid--;
-        }
+    for (auto i = 0; i < m_cluster_pose.size(); ++i) {
+      SegmentPose &pose = m_cluster_pose[i];
+      float min_z = pose.centroid.z() - pose.depth / 2.0f;
+      float plane_z = transform.getOrigin().z();
+      if (min_z > plane_z + 0.04f) m_valid_cluster[i] = false;
     }
-
-    m_found_clusters.resize(curr_valid);
-    m_cluster_pose.resize(curr_valid);
   }
 
   void segmentCloud() {
 
     if (m_cloud.points.size() == 0) return;
 
-    //ROS_INFO("Segmenting.1");
+    // ROS_INFO("Segmenting.1");
 
-    if (m_segmentation_request) {
+    pcl::PointCloud<pcl::PointXYZ> plane_cloud, filter_cloud;
+    vector<pcl::PointCloud<pcl::PointXYZ>> clusters;
+    ObjectSegmentation os;
+    os.clusterComponentsEuclidean(m_cloud, clusters);
+    m_found_clusters = clusters;
 
-      pcl::PointCloud<pcl::PointXYZ> plane_cloud, filter_cloud;
-      vector<pcl::PointCloud<pcl::PointXYZ>> clusters;
-      ObjectSegmentation os;
-      os.clusterComponentsEuclidean(m_cloud, clusters);
-      m_found_clusters = clusters;
+    for (auto cluster : m_found_clusters) {
+      Eigen::Vector4f centroid;
+      Eigen::Quaternionf rotation;
 
-      for (auto cluster : m_found_clusters) {
-        Eigen::Vector4f centroid;
-        Eigen::Quaternionf rotation;
+      float w, h, d;
+      os.extractPose(cluster, centroid, rotation, w, h, d);
 
-        float w, h, d;
-        os.extractPose(cluster, centroid, rotation, w, h, d);
+      tf::Vector3 tf_centroid(centroid.x(), centroid.y(), centroid.z());
+      tf::Quaternion tf_rotation(rotation.x(), rotation.y(), rotation.z(),
+                                 rotation.w());
+      m_cluster_pose.push_back(SegmentPose(tf_centroid, tf_rotation, w, h, d));
+      m_valid_cluster.push_back(true);
 
-        tf::Vector3 tf_centroid(centroid.x(), centroid.y(), centroid.z());
-        tf::Quaternion tf_rotation(rotation.x(), rotation.y(), rotation.z(),
-                                   rotation.w());
-        m_cluster_pose.push_back(
-            SegmentPose(tf_centroid, tf_rotation, w, h, d));
-
-        m_segmentation_ready = true;
-      }
-
-      stringstream ss;
-      ss << "SEG: num clusters found: " << m_found_clusters.size();
-      ROS_INFO(ss.str().c_str());
-
-      m_segmentation_request = false;
+      m_segmentation_ready = true;
     }
+
+    stringstream ss;
+    ss << "SEG: num clusters found: " << m_found_clusters.size();
+
+    auto count = 0;
+    for (auto b : m_valid_cluster) {
+      if (b) count++;
+    }
+    ss << " valid " << count;
+
+    filterClustersbySize();
+
+    count = 0;
+    for (auto b : m_valid_cluster) {
+      if (b) count++;
+    }
+    ss << " size filter " << count;
+
+    filterClustersByHeight();
+
+    count = 0;
+    for (auto b : m_valid_cluster) {
+      if (b) count++;
+    }
+    ss << " height filter " << count;
+
+    ROS_INFO(ss.str().c_str());
+
+    m_segmentation_request = false;
   }
 
   void publishMarkers() {
@@ -251,40 +253,39 @@ class CloudSegmenter {
 
   void publishTFPose() {
 
-  //stringstream d_ss;
-  //d_ss << "TF POSE: num_obj " << m_bin_items.size() << " " << m_cluster_pose.size();
-  //ROS_INFO(d_ss.str().c_str());
+    if (m_cluster_pose.size() < 1) return;
 
-    if(m_cluster_pose.size() < 1)
-        return;
+    int invalid = 0;
+    int valid = 0;
+    for(auto i = 0; i < m_valid_cluster.size(); ++i)
+    {
+        stringstream cluster_name;
 
-    tf::Vector3 &centroid = m_cluster_pose[0].centroid;
-    tf::Quaternion &rotation = m_cluster_pose[0].rotation;
+        if(!m_valid_cluster[i])
+        {
+            cluster_name << "invalid" << invalid;
+            invalid++;
+        }
+        else
+        {
+            if(valid < m_bin_items.size())
+                cluster_name << m_bin_items[valid];
+            else
+                cluster_name << "valid" << valid;
+            valid++;
+        }
 
-    tf::Transform transform;
-    transform.setOrigin(centroid);
-    transform.setRotation(rotation);
+        tf::Vector3 &centroid = m_cluster_pose[i].centroid;
+        tf::Quaternion &rotation = m_cluster_pose[i].rotation;
 
+        tf::Transform transform;
+        transform.setOrigin(centroid);
+        transform.setRotation(rotation);
 
-    m_tf_broadcaster.sendTransform(tf::StampedTransform(
-                  transform, ros::Time::now(), "base_footprint", m_obj_name));
-    /*for (auto i = 0; i < m_bin_items.size(); ++i) {
+        m_tf_broadcaster.sendTransform(tf::StampedTransform(
+            transform, ros::Time::now(), "base_footprint", cluster_name.str()));
 
-
-      if(m_cluster_pose.size() < i)
-      {
-          tf::Vector3 &centroid = m_cluster_pose[i].centroid;
-          tf::Quaternion &rotation = m_cluster_pose[i].rotation;
-
-          tf::Transform transform;
-          transform.setOrigin(centroid);
-          transform.setRotation(rotation);
-
-
-          //m_tf_broadcaster.sendTransform(tf::StampedTransform(
-          //    transform, ros::Time::now(), "base_footprint", ss.str()));
-      }
-    }*/
+    }
   }
 
  private:
@@ -414,6 +415,7 @@ class CloudSegmenter {
   pcl::PointCloud<pcl::PointXYZRGB> m_cloud_colour;
   vector<pcl::PointCloud<pcl::PointXYZ>> m_found_clusters;
   vector<SegmentPose> m_cluster_pose;
+  vector<bool> m_valid_cluster;
   atomic_bool m_segmentation_request;
   atomic_bool m_segmentation_ready;
 
@@ -430,8 +432,8 @@ int main(int argc, char **argv) {
 
   ros::Rate r(100);
   while (ros::ok()) {
-    //cs.segmentCloud();
-    //cs.publishMarkers();
+    // cs.segmentCloud();
+    // cs.publishMarkers();
     cs.publishTFPose();
     ros::spinOnce();
     r.sleep();

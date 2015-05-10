@@ -72,6 +72,8 @@ class SegmenterTestClient {
 
     m_cloud_publisher =
         m_nh.advertise<sensor_msgs::PointCloud2>("segmentation_test_cloud", 1);
+    m_shelf_pub =
+            m_nh.advertise<sensor_msgs::PointCloud2>("shelf_test_cloud", 1);
   };
 
   void rgbdCallback(const sensor_msgs::ImageConstPtr& depth_msg,
@@ -104,7 +106,8 @@ class SegmenterTestClient {
 
     cv_bridge::CvImageConstPtr cv_ptr;
     try {
-      cv_ptr = cv_bridge::toCvShare(rgb_msg, sensor_msgs::image_encodings::BGR8);
+      cv_ptr =
+          cv_bridge::toCvShare(rgb_msg, sensor_msgs::image_encodings::BGR8);
     }
     catch (cv_bridge::Exception& e) {
       ROS_ERROR("cv_bridge exception: %s", e.what());
@@ -119,13 +122,58 @@ class SegmenterTestClient {
     for (auto row = 0; row < h; ++row) {
       for (auto col = 0; col < w; ++col) {
         auto id = col + w * row;
-        cv::Vec3b rgb = img.at<cv::Vec3b>(row,col);
+        cv::Vec3b rgb = img.at<cv::Vec3b>(row, col);
         pcl::PointXYZRGB& p = m_colored_cloud.points[id];
         p.r = rgb.val[2];
         p.g = rgb.val[1];
         p.b = rgb.val[0];
       }
     }
+  }
+
+  void cropCloudBin(string bin_name, const pcl::PointCloud<pcl::PointXYZRGB>::Ptr& in,
+                    pcl::PointCloud<pcl::PointXYZRGB>::Ptr& out) {
+    tf::StampedTransform transform;
+    if (!getTimedTransform(m_tf_listener, "base_footprint", bin_name, 2.0f,
+                           transform)) {
+      ROS_WARN("Timeout in getting transform");
+      return;
+    }
+    Eigen::Vector3f size = getBinSize(bin_name);
+
+    auto origin = transform.getOrigin();
+
+    float min_x = origin.x() + 0.02;
+    float max_x = origin.x() + size.x() - 0.02;
+    float min_y = origin.y() + 0.02;
+    float max_y = origin.y() + size.y() - 0.02;
+    float min_z = origin.z() + 0.01;
+    float max_z = origin.z() + size.z() - 0.04f;
+
+    cropCloud(in, min_x, max_x, min_y, max_y, min_z, max_z, out);
+  }
+
+  void debugBin(string bin_name, pcl::PointCloud<pcl::PointXYZRGB>& out)
+  {
+      auto cloud_ptr = m_colored_cloud.makeShared();
+      pcl::PointCloud<pcl::PointXYZRGB>::Ptr cropped(new pcl::PointCloud<pcl::PointXYZRGB>);
+      cropCloudBin(bin_name, cloud_ptr, cropped);
+      Eigen::Vector3i color = getBinColor(bin_name);
+      for(auto i = 0; i < cropped->points.size(); ++i)
+      {
+          pcl::PointXYZRGB& pt = cropped->points[i];
+          pt.r = color.x();
+          pt.g = color.y();
+          pt.b = color.z();
+      }
+      out += *cropped;
+  }
+
+  void debugCropping()
+  {
+    m_d_crop_cloud.points.clear();
+    debugBin("shelf_bin_A", m_d_crop_cloud);
+
   }
 
   void publishCloud() {
@@ -147,9 +195,10 @@ class SegmenterTestClient {
   std::mutex m_mutex;
   sensor_msgs::CameraInfo m_camera_info_msg;
 
-  pcl::PointCloud<pcl::PointXYZRGB> m_colored_cloud;
+  pcl::PointCloud<pcl::PointXYZRGB> m_colored_cloud, m_d_crop_cloud;
+  pcl::PointCloud<pcl::PointXYZ> m_cloud;
 
-  ros::Publisher m_cloud_publisher;
+  ros::Publisher m_cloud_publisher, m_shelf_pub;
 
   tf::TransformListener m_tf_listener;
 };
