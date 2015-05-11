@@ -95,7 +95,7 @@ void ObjectSegmentation::clusterComponentsEuclidean(
 
   std::vector<pcl::PointIndices> cluster_indices;
   pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
-  ec.setClusterTolerance(0.005);  // 2cm
+  ec.setClusterTolerance(0.01);  // 2cm
   ec.setMinClusterSize(100);
   ec.setMaxClusterSize(25000);
   ec.setSearchMethod(tree);

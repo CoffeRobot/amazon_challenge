@@ -39,6 +39,8 @@ using namespace std;
 
 namespace amazon_challenge {
 
+enum SEG_TYPE {VALID=0, SIZE, HEIGHT};
+
 struct SegmentPose {
 
   tf::Vector3 centroid;
@@ -68,28 +70,37 @@ class CloudSegmenter {
     m_bin_item_subscriber = m_nh.subscribe(
         "/amazon_bin_items", 10, &CloudSegmenter::binItemsCallback, this);
     m_segmentation_request = false;
+    m_is_publishing = false;
   };
 
   bool receivePointCloud(vision::ReceiveCloud::Request &req,
                          vision::ReceiveCloud::Response &res) {
-    stringstream ss;
-    ss << "Cloud to segment received: points ";
 
-    m_mutex.lock();
-    m_cloud.clear();
-    pcl::fromROSMsg(req.cloud, m_cloud);
-    ss << m_cloud.points.size();
-    ROS_INFO(ss.str().c_str());
+    if (req.stop_publish) {
+      m_is_publishing = false;
+      res.result = true;
+      ROS_INFO("Segmentation: stop publishing!");
+    } else {
+      stringstream ss;
+      ss << "Cloud to segment received: points ";
 
-    m_mutex.unlock();
-    //pcl::copyPointCloud(m_cloud, m_cloud_colour);
-    m_segmentation_request = true;
-    m_segmentation_ready = false;
+      m_mutex.lock();
+      m_cloud.clear();
+      pcl::fromROSMsg(req.cloud, m_cloud);
+      ss << m_cloud.points.size();
+      ROS_INFO(ss.str().c_str());
 
-    segmentCloud();
+      m_mutex.unlock();
+      // pcl::copyPointCloud(m_cloud, m_cloud_colour);
+      m_segmentation_request = true;
+      m_segmentation_ready = false;
+      segmentCloud();
 
-    res.result = true;
-    return true;
+      m_is_publishing = true;
+
+      res.result = true;
+      return true;
+    }
   }
 
   void nextTaskCallback(const std_msgs::String::ConstPtr &msg) {
@@ -141,7 +152,7 @@ class CloudSegmenter {
       if (pose.depth >= 0.02 && pose.depth < 0.15) valid_dimensions++;
 
       if (valid_dimensions < 2) {
-        m_valid_cluster[i] = false;
+        m_is_valid_cluster[i] = SEG_TYPE::SIZE;
       }
     }
   }
@@ -159,7 +170,7 @@ class CloudSegmenter {
       SegmentPose &pose = m_cluster_pose[i];
       float min_z = pose.centroid.z() - pose.depth / 2.0f;
       float plane_z = transform.getOrigin().z();
-      if (min_z > plane_z + 0.04f) m_valid_cluster[i] = false;
+      if (min_z > plane_z + 0.04f) m_is_valid_cluster[i] = SEG_TYPE::HEIGHT;
     }
   }
 
@@ -167,15 +178,18 @@ class CloudSegmenter {
 
     if (m_cloud.points.size() == 0) return;
 
-    // ROS_INFO("Segmenting.1");
+    m_found_clusters.clear();
 
     pcl::PointCloud<pcl::PointXYZ> plane_cloud, filter_cloud;
     vector<pcl::PointCloud<pcl::PointXYZ>> clusters;
     ObjectSegmentation os;
     os.clusterComponentsEuclidean(m_cloud, clusters);
     m_found_clusters = clusters;
+    m_cluster_pose.clear();
+    m_is_valid_cluster.clear();
 
     for (auto cluster : m_found_clusters) {
+
       Eigen::Vector4f centroid;
       Eigen::Quaternionf rotation;
 
@@ -186,7 +200,7 @@ class CloudSegmenter {
       tf::Quaternion tf_rotation(rotation.x(), rotation.y(), rotation.z(),
                                  rotation.w());
       m_cluster_pose.push_back(SegmentPose(tf_centroid, tf_rotation, w, h, d));
-      m_valid_cluster.push_back(true);
+      m_is_valid_cluster.push_back(SEG_TYPE::VALID);
 
       m_segmentation_ready = true;
     }
@@ -195,53 +209,52 @@ class CloudSegmenter {
     ss << "SEG: num clusters found: " << m_found_clusters.size();
 
     auto count = 0;
-    for (auto b : m_valid_cluster) {
-      if (b) count++;
+    for (auto b : m_is_valid_cluster) {
+      if (b == SEG_TYPE::VALID) count++;
     }
     ss << " valid " << count;
 
     filterClustersbySize();
 
     count = 0;
-    for (auto b : m_valid_cluster) {
-      if (b) count++;
+    for (auto b : m_is_valid_cluster) {
+      if (b == SEG_TYPE::VALID) count++;
     }
     ss << " size filter " << count;
 
     filterClustersByHeight();
 
     count = 0;
-    for (auto b : m_valid_cluster) {
-      if (b) count++;
+    for (auto b : m_is_valid_cluster) {
+      if (b == SEG_TYPE::VALID) count++;
     }
     ss << " height filter " << count;
 
     pcl::PointCloud<pcl::PointXYZRGB> cluster_cloud;
-    //pcl::copyPointCloud(m_cloud, m_cloud_colour);
+    // pcl::copyPointCloud(m_cloud, m_cloud_colour);
 
     default_random_engine rde;
     uniform_int_distribution<int> distribution(0, 255);
 
+    for (auto i = 0; i < m_is_valid_cluster.size(); i++) {
+      if (m_is_valid_cluster[i] == SEG_TYPE::VALID) {
+        pcl::PointCloud<pcl::PointXYZRGB> cluster_rgb;
+        pcl::copyPointCloud(m_found_clusters[i], cluster_rgb);
 
-    for(auto i = 0; i < m_valid_cluster.size(); i++)
-    {
-        if(m_valid_cluster[i])
-        {
-            pcl::PointCloud<pcl::PointXYZRGB> cluster_rgb;
-            pcl::copyPointCloud(m_found_clusters[i], cluster_rgb);
+        int r = distribution(rde);
+        int g = distribution(rde);
+        int b = distribution(rde);
 
-            for(auto j = 0; j < cluster_rgb.points.size(); ++j)
-            {
-                pcl::PointXYZRGB& pt = cluster_rgb.points[j];
-                pt.r = distribution(rde);
-                pt.g = distribution(rde);
-                pt.b = distribution(rde);
-            }
-
-            cluster_cloud += cluster_rgb;
+        for (auto j = 0; j < cluster_rgb.points.size(); ++j) {
+          pcl::PointXYZRGB &pt = cluster_rgb.points[j];
+          pt.r = r;
+          pt.g = g;
+          pt.b = b;
         }
-    }
 
+        cluster_cloud += cluster_rgb;
+      }
+    }
 
     m_cloud_colour = cluster_cloud;
 
@@ -286,46 +299,47 @@ class CloudSegmenter {
 
     int invalid = 0;
     int valid = 0;
-    for(auto i = 0; i < m_valid_cluster.size(); ++i)
-    {
-        stringstream cluster_name;
+    for (auto i = 0; i < m_is_valid_cluster.size(); ++i) {
+      stringstream cluster_name;
 
-        if(!m_valid_cluster[i])
-        {
-            cluster_name << "invalid" << invalid;
-            invalid++;
-        }
+      if (m_is_valid_cluster[i] == SEG_TYPE::SIZE) {
+        cluster_name << "size" << invalid;
+        invalid++;
+      }
+      else if (m_is_valid_cluster[i] == SEG_TYPE::HEIGHT) {
+        cluster_name << "height" << invalid;
+        invalid++;
+      }
+      else {
+        if (valid < m_bin_items.size())
+          cluster_name << m_bin_items[valid];
         else
-        {
-            if(valid < m_bin_items.size())
-                cluster_name << m_bin_items[valid];
-            else
-                cluster_name << "valid" << valid;
-            valid++;
-        }
+          cluster_name << "valid" << valid;
+        valid++;
+      }
 
-        tf::Vector3 &centroid = m_cluster_pose[i].centroid;
-        tf::Quaternion &rotation = m_cluster_pose[i].rotation;
+      tf::Vector3 &centroid = m_cluster_pose[i].centroid;
+      tf::Quaternion &rotation = m_cluster_pose[i].rotation;
 
-        tf::Transform transform;
-        transform.setOrigin(centroid);
-        transform.setRotation(rotation);
+      tf::Transform transform;
+      transform.setOrigin(centroid);
+      transform.setRotation(rotation);
 
-        m_tf_broadcaster.sendTransform(tf::StampedTransform(
-            transform, ros::Time::now(), "base_footprint", cluster_name.str()));
-
+      m_tf_broadcaster.sendTransform(tf::StampedTransform(
+          transform, ros::Time::now(), "base_footprint", cluster_name.str()));
     }
   }
 
   void publishClusters() {
-    if(m_cloud_colour.points.size() > 0)
-    {
-        m_cloud_colour.header.frame_id = m_cloud.header.frame_id;
-        sensor_msgs::PointCloud2 cloud;
-        pcl::toROSMsg(m_cloud_colour, cloud);
-        m_segmentation_pub.publish(cloud);
+    if (m_cloud_colour.points.size() > 0) {
+      m_cloud_colour.header.frame_id = m_cloud.header.frame_id;
+      sensor_msgs::PointCloud2 cloud;
+      pcl::toROSMsg(m_cloud_colour, cloud);
+      m_segmentation_pub.publish(cloud);
     }
   }
+
+  bool needToPublish() { return m_is_publishing; }
 
  private:
   void extractPose(const pcl::PointCloud<pcl::PointXYZ> &in_cloud,
@@ -366,8 +380,6 @@ class CloudSegmenter {
     pcl::toROSMsg(in_cloud, cloud);
     m_segmentation_pub.publish(cloud);
   }
-
-
 
   visualization_msgs::Marker mark_cluster(
       pcl::PointCloud<pcl::PointXYZ> &cloud_cluster, std::string ns, int id,
@@ -456,13 +468,15 @@ class CloudSegmenter {
   pcl::PointCloud<pcl::PointXYZRGB> m_cloud_colour;
   vector<pcl::PointCloud<pcl::PointXYZ>> m_found_clusters;
   vector<SegmentPose> m_cluster_pose;
-  vector<bool> m_valid_cluster;
+  vector<int> m_is_valid_cluster;
   atomic_bool m_segmentation_request;
   atomic_bool m_segmentation_ready;
 
   string m_bin_name;
   string m_obj_name;
   vector<string> m_bin_items;
+
+  atomic_bool m_is_publishing;
 };
 }
 int main(int argc, char **argv) {
@@ -473,10 +487,10 @@ int main(int argc, char **argv) {
 
   ros::Rate r(100);
   while (ros::ok()) {
-    // cs.segmentCloud();
-    // cs.publishMarkers();
-    cs.publishTFPose();
-    cs.publishClusters();
+    if (cs.needToPublish()) {
+      cs.publishTFPose();
+      cs.publishClusters();
+    }
     ros::spinOnce();
     r.sleep();
   }

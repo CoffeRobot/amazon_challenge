@@ -15,6 +15,7 @@
 #include <tf/transform_listener.h>
 #include <pcl/filters/passthrough.h>
 #include <DepthTraits.h>
+#include <sstream>
 
 namespace amazon_challenge {
 
@@ -159,7 +160,7 @@ void colorCloudWithBin(std::string bin_name, tf::Vector3& origin,
 
 void cropCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_ptr,
                float min_x, float max_x, float min_y, float max_y, float min_z,
-               float max_z, pcl::PointCloud<pcl::PointXYZ>::Ptr cropped)
+               float max_z, pcl::PointCloud<pcl::PointXYZ>::Ptr& cropped)
 {
   pcl::PassThrough<pcl::PointXYZ> pass;
   pass.setInputCloud(cloud_ptr);
@@ -181,7 +182,7 @@ void cropCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_ptr,
 
 void cropCloud(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_ptr,
                float min_x, float max_x, float min_y, float max_y, float min_z,
-               float max_z, pcl::PointCloud<pcl::PointXYZRGB>::Ptr cropped)
+               float max_z, pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cropped)
 {
   pcl::PassThrough<pcl::PointXYZRGB> pass;
   pass.setInputCloud(cloud_ptr);
@@ -214,6 +215,9 @@ bool getTimedTransform(const tf::TransformListener& listener,
     catch (tf::TransformException& ex) {
     }
   }
+  std::stringstream ss;
+  ss << "TF: timeout for " << target_frame << " " << dest_frame;
+  ROS_ERROR(ss.str().c_str());
   return false;
 }
 

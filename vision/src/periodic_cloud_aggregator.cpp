@@ -35,6 +35,8 @@
 #include <message_filters/subscriber.h>
 #include <message_filters/time_synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
+#include <cv_bridge/cv_bridge.h>
+#include <opencv2/core/core.hpp>
 
 // Services
 #include <laser_assembler/AssembleScans2.h>
@@ -69,13 +71,17 @@ class PeriodicCloudPublisher {
         m_action_name("periodic_cloud_aggregator"),
         m_build_aggregated_cloud(false),
         m_bin_cloud(new pcl::PointCloud<pcl::PointXYZ>),
-        m_shelf_cloud(new pcl::PointCloud<pcl::PointXYZ>) {
+        m_shelf_cloud(new pcl::PointCloud<pcl::PointXYZ>),
+        m_bin_cloud_rgb(new pcl::PointCloud<pcl::PointXYZRGB>)
+  {
 
     m_publisher = m_nh.advertise<sensor_msgs::PointCloud2>("periodic_cloud", 1);
     m_shelf_publisher =
         m_nh.advertise<sensor_msgs::PointCloud2>("periodic_cloud_shelf", 1);
     m_bin_publisher =
         m_nh.advertise<sensor_msgs::PointCloud2>("periodic_cloud_bin", 1);
+    m_kinect_publisher =
+            m_nh.advertise<sensor_msgs::PointCloud2>("periodic_color_cloud", 1);
 
     m_client =
         m_nh.serviceClient<laser_assembler::AssembleScans2>("assemble_scans2");
@@ -85,45 +91,31 @@ class PeriodicCloudPublisher {
         m_nh.subscribe("/amazon_next_task", 10,
                        &PeriodicCloudPublisher::taskmanagerCallback, this);
 
-    m_kinect_subscriber = m_nh.subscribe<sensor_msgs::Image>(
-        "/head_mount_kinect/depth_registered/sw_registered/image_rect_raw", 1,
-        &PeriodicCloudPublisher::depthCallback, this);
-    m_camera_info_sub = m_nh.subscribe<sensor_msgs::CameraInfo>(
-        "/head_mount_kinect/depth_registered/sw_registered/camera_info", 1,
-        &PeriodicCloudPublisher::cameraInfoCallback, this);
+    //m_kinect_subscriber = m_nh.subscribe<sensor_msgs::Image>(
+    //    "/head_mount_kinect/depth_registered/sw_registered/image_rect_raw", 1,
+    //    &PeriodicCloudPublisher::depthCallback, this);
+    //m_camera_info_sub = m_nh.subscribe<sensor_msgs::CameraInfo>(
+    //    "/head_mount_kinect/depth_registered/sw_registered/camera_info", 1,
+    //    &PeriodicCloudPublisher::cameraInfoCallback, this);
 
     m_depth_it.reset(new image_transport::ImageTransport(m_nh));
-    m_sub_depth.subscribe(*m_depth_it, "/head_mount_kinect/depth_registered/sw_registered", 1, image_transport::TransportHints("raw"));
+    m_sub_depth.subscribe(
+        *m_depth_it,
+        "/head_mount_kinect/depth_registered/sw_registered/image_rect_raw", 1,
+        image_transport::TransportHints("compressedDepth"));
     m_rgb_it.reset(new image_transport::ImageTransport(m_nh));
-    m_sub_rgb.subscribe(*m_rgb_it, "/head_mount_kinect/rgb/image_rect_color", 1, image_transport::TransportHints("raw"));
+    m_sub_rgb.subscribe(*m_rgb_it, "/head_mount_kinect/rgb/image_rect_color", 1,
+                        image_transport::TransportHints("compressed"));
     m_sub_rgb_info.subscribe(m_nh, "/head_mount_kinect/rgb/camera_info", 1);
 
     m_sync_rgbd.reset(new SynchronizerRGBD(SyncPolicyRGBD(5), m_sub_depth,
                                            m_sub_rgb, m_sub_rgb_info));
-    m_sync_rgbd->registerCallback(boost::bind(&PeriodicCloudPublisher::rgbdCallback, this, _1, _2, _3));
-
-
-
+    m_sync_rgbd->registerCallback(
+        boost::bind(&PeriodicCloudPublisher::rgbdCallback, this, _1, _2, _3));
 
     m_service_server = m_nh.advertiseService(
         "aggregate_cloud", &PeriodicCloudPublisher::serviceCallback, this);
 
-
-    /*
-     * m_rgb_filter.subscribe(
-         m_nh, "/head_mount_kinect/rgb/image_rect_color/compressed", 1);
-     m_camera_info_filter.subscribe(m_nh, "/head_mount_kinect/rgb/camera_info",
-                                    1);
-     m_depth_filter.subscribe(
-         m_nh,
-         "/head_mount_kinect/depth_registered/sw_registered/image_rect_raw", 1);
-     m_kinect_sync = std::make_shared<SynchronizerRGBD>(new SynchronizerRGBD(
-         m_rgb_filter, m_depth_filter, m_camera_info_filter,
-     SyncPolicyRGBD(5)));
-
-     m_kinect_sync->registerCallback(
-         boost::bind(&PeriodicCloudPublisher::rgbdCallback, this, _1, _2, _3));
-     */
     m_tf_listener =
         unique_ptr<tf::TransformListener>(new tf::TransformListener());
 
@@ -167,53 +159,64 @@ class PeriodicCloudPublisher {
     }
   }
 
-  bool serviceCallback(vision::StartAggregator::Request &req,
-                       vision::StartAggregator::Response &res)
-  {
-    ROS_INFO("Start Aggregating");
+  bool serviceCallback(vision::StartAggregator::Request& req,
+                       vision::StartAggregator::Response& res) {
 
-    startTiltScanner();
 
-    m_build_aggregated_cloud = true;
-    m_laser_request_start = ros::Time::now();
+    if(req.flag == 0)
+    {
+        ROS_INFO("Start Aggregating");
 
-    ROS_INFO("Aggregating...");
+        startTiltScanner();
 
-    while (!m_aggregated_cloud_ready) {
-        ros::spinOnce();
-        //ROS_INFO("spinngin once");
-      // check that preempt has not been requested by the client
+        m_build_aggregated_cloud = true;
+        m_laser_request_start = ros::Time::now();
 
+        ROS_INFO("Aggregating...");
+
+        while (!m_aggregated_cloud_ready) {
+          ros::spinOnce();
+          // ROS_INFO("spinngin once");
+          // check that preempt has not been requested by the client
+        }
+
+        auto elapsed = (ros::Time::now() - m_laser_request_start).toSec();
+        stringstream ss;
+        ss << "CB: Cloud built in: " << elapsed << " secs";
+
+        // building the clouds
+        ROS_INFO(ss.str().c_str());
+        sensor_msgs::PointCloud2 bin_msg,rgbd_msg;
+
+        pcl::toROSMsg(*m_bin_cloud, bin_msg);
+        pcl::toROSMsg(*m_bin_cloud_rgb, rgbd_msg);
+
+        // notify segmentation and tracking
+        notifySegmentationWithClouds(bin_msg, rgbd_msg);
+        //notifyTracker(out_msg);
+        m_aggregated_cloud_ready = false;
+        m_build_aggregated_cloud = false;
+        stopTiltScanner();
+
+        res.result = true;
+
+        return true;
     }
+    else if(req.flag == 1)
+    {
+        // used to tell the segmentation to stop publishing
+        notifySegmentationToStop();
 
-    auto elapsed = (ros::Time::now() - m_laser_request_start).toSec();
-    stringstream ss;
-    ss << "CB: Cloud built in: " << elapsed << " secs";
-
-    // building the clouds
-    ROS_INFO(ss.str().c_str());
-    sensor_msgs::PointCloud2 out_msg, shelf_msg, bin_msg;
-    pcl::toROSMsg(m_aggregated_cloud, out_msg);
-    pcl::toROSMsg(*m_bin_cloud, bin_msg);
-    pcl::toROSMsg(*m_shelf_cloud, shelf_msg);
-
-    // notify segmentation and tracking
-    notifySegmentation(bin_msg);
-    notifyTracker(out_msg);
-    m_aggregated_cloud_ready = false;
-    m_build_aggregated_cloud = false;
-    stopTiltScanner();
-
-    res.result = true;
-
-    return true;
+        res.result = true;
+        return true;
+    }
 
   }
 
   void executeCB(const vision::BTGoalConstPtr& goal) {
 
     // publish info to the console for the user
-    ROS_INFO("Starting Action");
+    /*ROS_INFO("Starting Action");
     m_build_aggregated_cloud = true;
     m_laser_request_start = ros::Time::now();
     startTiltScanner();
@@ -237,31 +240,50 @@ class PeriodicCloudPublisher {
 
     // building the clouds
     ROS_INFO(ss.str().c_str());
-    sensor_msgs::PointCloud2 out_msg, shelf_msg, bin_msg;
+    sensor_msgs::PointCloud2 out_msg, shelf_msg, bin_msg, rgbd_msg;
     pcl::toROSMsg(m_aggregated_cloud, out_msg);
     pcl::toROSMsg(*m_bin_cloud, bin_msg);
     pcl::toROSMsg(*m_shelf_cloud, shelf_msg);
+    pcl::toROSMsg(*m_bin_cloud_rgb, rgbd_msg);
 
     // notify segmentation and tracking
-    notifySegmentation(bin_msg);
+    notifySegmentationWithClouds(bin_msg, rgbd_msg);
     notifyTracker(out_msg);
     m_aggregated_cloud_ready = false;
     m_build_aggregated_cloud = false;
-    stopTiltScanner();
+    stopTiltScanner();*/
     // communicate bt the success
     setStatus(SUCCESS);
   }
 
-  void notifySegmentation(sensor_msgs::PointCloud2& cloud) {
+  void notifySegmentationWithClouds(sensor_msgs::PointCloud2& cloud,
+                                    sensor_msgs::PointCloud2& kinect) {
     vision::ReceiveCloud srv;
     srv.request.cloud = cloud;
+    srv.request.rgb_cloud = kinect;
+    srv.request.stop_publish = false;
+
     // Make the service call
     if (m_segmentation_client.call(srv)) {
       bool result = srv.response.result;
-      if (result) ROS_INFO("Segmentation node notified");
+      if (result) ROS_INFO("Segmentation node notified to start");
     } else {
       ROS_ERROR("Segmentation node not listening");
     }
+  }
+
+  void notifySegmentationToStop()
+  {
+      vision::ReceiveCloud srv;
+      srv.request.stop_publish = true;
+      // = cloud;
+      // Make the service call
+      if (m_segmentation_client.call(srv)) {
+        bool result = srv.response.result;
+        if (result) ROS_INFO("Segmentation node notified to stop");
+      } else {
+        ROS_ERROR("Segmentation node not listening");
+      }
   }
 
   void notifyTracker(sensor_msgs::PointCloud2& cloud) {
@@ -282,15 +304,13 @@ class PeriodicCloudPublisher {
 
     try {
       m_tf_listener->lookupTransform(target_frame, dest_frame, ros::Time(0),
-                               transform);
+                                     transform);
       origin = transform.getOrigin();
       return true;
     }
     catch (tf::TransformException& ex) {
-        return false;
+      return false;
     }
-
-
   }
 
   void stopTiltScanner() {
@@ -317,10 +337,9 @@ class PeriodicCloudPublisher {
 
     tf::Vector3 scanner_origin, bin_origin;
 
-    while(!getTransformOrigin("laser_tilt_link", scanner_origin)||
-                    !getTransformOrigin("shelf_" + m_bin_name, bin_origin))
-    {
-            ros::Duration(0.1).sleep();
+    while (!getTransformOrigin("laser_tilt_link", scanner_origin) ||
+           !getTransformOrigin("shelf_" + m_bin_name, bin_origin)) {
+      ros::Duration(0.1).sleep();
     }
 
     float z_shelf_laser = scanner_origin.z();
@@ -404,6 +423,33 @@ class PeriodicCloudPublisher {
                                  *m_tf_listener);
 
     pcl::fromROSMsg(out, m_kinect_cloud);
+    pcl::copyPointCloud(m_kinect_cloud, m_kinect_color_cloud);
+
+    cv_bridge::CvImageConstPtr cv_ptr;
+    try {
+      cv_ptr =
+          cv_bridge::toCvShare(m_last_rgb_msg, sensor_msgs::image_encodings::BGR8);
+    }
+    catch (cv_bridge::Exception& e) {
+      ROS_ERROR("cv_bridge exception: %s", e.what());
+      return;
+    }
+
+    auto w = m_kinect_color_cloud.width;
+    auto h = m_kinect_color_cloud.height;
+
+    const cv::Mat& img = cv_ptr->image;
+
+    for (auto row = 0; row < h; ++row) {
+      for (auto col = 0; col < w; ++col) {
+        auto id = col + w * row;
+        cv::Vec3b rgb = img.at<cv::Vec3b>(row, col);
+        pcl::PointXYZRGB& p = m_kinect_color_cloud.points[id];
+        p.r = rgb.val[2];
+        p.g = rgb.val[1];
+        p.b = rgb.val[0];
+      }
+    }
   }
 
   void cameraInfoCallback(const sensor_msgs::CameraInfoConstPtr& rgb_info_msg) {
@@ -509,7 +555,7 @@ class PeriodicCloudPublisher {
       m_aggregated_cloud = laser_cloud;
       m_aggregated_cloud += m_kinect_cloud;
 
-      createCloudBin(m_aggregated_cloud);
+      createCloudBin(m_aggregated_cloud.makeShared(), m_kinect_color_cloud.makeShared());
       CreateCloudShelf(m_aggregated_cloud);
 
       m_aggregated_cloud_ready = true;
@@ -530,7 +576,21 @@ class PeriodicCloudPublisher {
                     const sensor_msgs::ImageConstPtr& rgb_msg,
                     const sensor_msgs::CameraInfoConstPtr& rgb_info_msg) {
 
-    ROS_INFO("Received full optional kinect data :)");
+    if (!m_build_aggregated_cloud) {
+      // ROS_INFO("Kinect: Aggregated cloud not requested!");
+      return;
+    }
+
+    auto elapsed = chrono::duration_cast<chrono::milliseconds>(
+        chrono::system_clock::now() - m_kinect_last_received).count();
+
+    if (static_cast<float>(elapsed) < m_kinect_timeout_ms) {
+      // ROS_INFO("Kinect: timeout!");
+      return;
+    }
+    m_kinect_last_received = chrono::system_clock::now();
+
+    ROS_INFO("Full kinect data received");
 
     auto can_lock = m_mutex.try_lock();
 
@@ -538,30 +598,29 @@ class PeriodicCloudPublisher {
       // ROS_INFO("Mutex locked by kinect");
       m_last_depth_msg = depth_msg;
       m_last_rgb_msg = rgb_msg;
+      m_camera_info_msg = *rgb_info_msg;
+      if (!m_first_dimage_received) m_first_dimage_received = true;
       m_mutex.unlock();
       // ROS_INFO("Mutex unlocked by kinect");
     } else
       return;
-
   }
 
   void depthCallback(const sensor_msgs::ImageConstPtr& depth_msg) {
 
     if (!m_build_aggregated_cloud) {
-      //ROS_INFO("Kinect: Aggregated cloud not requested!");
+      // ROS_INFO("Kinect: Aggregated cloud not requested!");
       return;
     }
 
-
-    //ROS_INFO("Kinect depth received");
+    // ROS_INFO("Kinect depth received");
 
     auto elapsed = chrono::duration_cast<chrono::milliseconds>(
         chrono::system_clock::now() - m_kinect_last_received).count();
 
-    if (static_cast<float>(elapsed) < m_kinect_timeout_ms)
-    {
-        //ROS_INFO("Kinect: timeout!");
-        return;
+    if (static_cast<float>(elapsed) < m_kinect_timeout_ms) {
+      // ROS_INFO("Kinect: timeout!");
+      return;
     }
     m_kinect_last_received = chrono::system_clock::now();
 
@@ -575,9 +634,8 @@ class PeriodicCloudPublisher {
       if (!m_first_dimage_received) m_first_dimage_received = true;
       m_mutex.unlock();
       // ROS_INFO("Mutex unlocked by kinect");
-    } else
-    {
-        ROS_INFO("Kinect: lock!");
+    } else {
+      ROS_INFO("Kinect: lock!");
       return;
     }
   }
@@ -632,7 +690,7 @@ class PeriodicCloudPublisher {
                                      transform);
     }
     catch (tf::TransformException& ex) {
-      //ROS_ERROR("Error in shelf publish of type %s", ex.what());
+      // ROS_ERROR("Error in shelf publish of type %s", ex.what());
       return;
     }
     auto origin = transform.getOrigin();
@@ -687,15 +745,17 @@ class PeriodicCloudPublisher {
 
   void publishClouds() {
 
-    sensor_msgs::PointCloud2 out_msg, bin_msg, shelf_msg;
+    sensor_msgs::PointCloud2 out_msg, bin_msg, shelf_msg, kinect_msg;
     pcl::toROSMsg(m_colored_cloud, out_msg);
     pcl::toROSMsg(*m_bin_cloud, bin_msg);
     pcl::toROSMsg(*m_shelf_cloud, shelf_msg);
+    pcl::toROSMsg(*m_bin_cloud_rgb, kinect_msg);
 
     // publish clouds for debugging purposes
     m_publisher.publish(out_msg);
     m_shelf_publisher.publish(shelf_msg);
     m_bin_publisher.publish(bin_msg);
+    m_kinect_publisher.publish(kinect_msg);
   }
 
   void publishMarkers() { publishCurrentBinMarkers(); }
@@ -752,63 +812,37 @@ class PeriodicCloudPublisher {
     pass.filter(*m_shelf_cloud);
   }
 
-  void createCloudBin(const pcl::PointCloud<pcl::PointXYZ>& cloud) {
+  void createCloudBin(const pcl::PointCloud<pcl::PointXYZ>::Ptr& d_cloud,
+                      const pcl::PointCloud<pcl::PointXYZRGB>::Ptr& rgb_cloud)
+  {
     tf::StampedTransform transform;
     string target_frame = "base_footprint";
     m_mutex.lock();
     string dest_frame = "shelf_" + m_bin_name;
     m_mutex.unlock();
 
-    try {
-      m_tf_listener->lookupTransform(target_frame, dest_frame, ros::Time(0),
-                                     transform);
-    }
-    catch (tf::TransformException& ex) {
-      ROS_ERROR("Erro in bin publish of type %s", ex.what());
-      return;
-    }
-    auto origin = transform.getOrigin();
-
-    float min_x, max_x, min_y, max_y, min_z, max_z;
-
-    auto size = getBinSize(m_bin_name);
-    float filter_offset = 0.02;
-    min_x = 0.04;
-    min_y = 0.02;
-    min_z = 0.00;
-    max_x = size.x() - filter_offset;
-    max_y = size.y() - filter_offset;
-    max_z = size.z() - filter_offset;
-
     // cleaning the old cloud
     m_bin_cloud->clear();
+    m_bin_cloud_rgb->clear();
 
-    pcl::PassThrough<pcl::PointXYZ> pass;
-    pass.setInputCloud(cloud.makeShared());
+    getTimedTransform(*m_tf_listener, target_frame, dest_frame, 2.0f, transform);
+    auto origin = transform.getOrigin();
 
-    auto min_range = origin.x() + min_x;
-    auto max_range = origin.x() + max_x;
-    pass.setFilterFieldName("x");
-    pass.setFilterLimits(min_range, max_range);
-    pass.filter(*m_bin_cloud);
+    auto size = getBinSize(m_bin_name);
 
-    min_range = origin.y() + min_y;
-    max_range = origin.y() + max_y;
-    pass.setInputCloud(m_bin_cloud);
-    pass.setFilterFieldName("y");
-    pass.setFilterLimits(min_range, max_range);
-    pass.filter(*m_bin_cloud);
+    float min_x = origin.x() + 0.04;
+    float max_x = origin.x() + size.x() - 0.02;
+    float min_y = origin.y() + 0.02;
+    float max_y = origin.y() + size.y() - 0.035;
+    float min_z = origin.z() + 0.01;
+    float max_z = origin.z() + size.z() - 0.04f;
 
-    float min_range_z = origin.z() + min_z;
-    float max_range_z = origin.z() + max_z;
-    pass.setInputCloud(m_bin_cloud);
-    pass.setFilterFieldName("z");
-    pass.setFilterLimits(min_range_z, max_range_z);
-    pass.filter(*m_bin_cloud);
+    cropCloud(d_cloud, min_x, max_x, min_y, max_y, min_z, max_z, m_bin_cloud);
+    cropCloud(rgb_cloud, min_x, max_x, min_y, max_y, min_z, max_z, m_bin_cloud_rgb);
   }
 
   // publishers
-  ros::Publisher m_publisher, m_shelf_publisher, m_bin_publisher;
+  ros::Publisher m_publisher, m_shelf_publisher, m_bin_publisher, m_kinect_publisher;
   // service clients
   ros::ServiceClient m_client, m_segmentation_client, m_tracking_client,
       m_pr2_laser_client;
@@ -853,7 +887,8 @@ class PeriodicCloudPublisher {
 
   pcl::PointCloud<pcl::PointXYZ> m_aggregated_cloud, m_kinect_cloud;
   pcl::PointCloud<pcl::PointXYZ>::Ptr m_bin_cloud, m_shelf_cloud;
-  pcl::PointCloud<pcl::PointXYZRGB> m_colored_cloud;
+  pcl::PointCloud<pcl::PointXYZRGB>::Ptr m_bin_cloud_rgb;
+  pcl::PointCloud<pcl::PointXYZRGB> m_colored_cloud, m_kinect_color_cloud;
 
   sensor_msgs::CameraInfo m_camera_info_msg;
   sensor_msgs::ImageConstPtr m_last_depth_msg;
