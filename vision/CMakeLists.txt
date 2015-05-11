@@ -32,7 +32,7 @@ add_action_files(
 
 add_service_files(
   DIRECTORY srv
-  FILES ReceiveCloud.srv StartAggregator.srv
+  FILES ReceiveCloud.srv StartAggregator.srv CropShelf.srv
 )
 
 generate_messages(
@@ -149,6 +149,18 @@ target_link_libraries(segmentation_test_client
   ${PCL_LIBRARIES}
   ${OpenCV_LIBS}
 )
+
+add_executable(shelf_crop_tool
+    src/shelf_crop_tool.cpp
+)
+
+target_link_libraries(shelf_crop_tool
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBS}
+  ${PCL_LIBRARIES}
+  ${OpenCV_LIBS}
+)
+
 
 #add_executable(cloud_publisher
 #    src/cloud_publisher.cpp)

@@ -50,10 +50,10 @@ using namespace std;
 
 namespace amazon_challenge {
 
-class SegmenterTestClient {
+class CropTool {
 
  public:
-  SegmenterTestClient() : m_nh() {
+  CropTool() : m_nh() {
 
     m_depth_it.reset(new image_transport::ImageTransport(m_nh));
     m_sub_depth.subscribe(
@@ -68,7 +68,7 @@ class SegmenterTestClient {
     m_sync_rgbd.reset(new SynchronizerRGBD(SyncPolicyRGBD(5), m_sub_depth,
                                            m_sub_rgb, m_sub_rgb_info));
     m_sync_rgbd->registerCallback(
-        boost::bind(&SegmenterTestClient::rgbdCallback, this, _1, _2, _3));
+        boost::bind(&CropTool::rgbdCallback, this, _1, _2, _3));
 
     m_cloud_publisher =
         m_nh.advertise<sensor_msgs::PointCloud2>("segmentation_test_cloud", 1);
@@ -232,7 +232,7 @@ int main(int argc, char** argv) {
 
   ros::init(argc, argv, "segmentation_test_client");
 
-  amazon_challenge::SegmenterTestClient tc;
+  amazon_challenge::CropTool tc;
 
   ros::Rate r(100);
   while (ros::ok()) {

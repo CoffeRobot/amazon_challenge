@@ -312,9 +312,9 @@ class CloudSegmenter {
       }
       else {
         if (valid < m_bin_items.size())
-          cluster_name << m_bin_items[valid];
+          cluster_name << m_bin_items[valid] << "_scan";
         else
-          cluster_name << "valid" << valid;
+          cluster_name << "valid" << valid << "_scan";
         valid++;
       }
 
