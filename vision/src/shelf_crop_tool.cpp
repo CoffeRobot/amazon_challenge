@@ -83,6 +83,8 @@ class CropTool {
             m_nh.advertise<sensor_msgs::PointCloud2>("crop_bin_D", 1);
     m_shelf_E_pub =
             m_nh.advertise<sensor_msgs::PointCloud2>("crop_bin_E", 1);
+    m_shelf_F_pub =
+            m_nh.advertise<sensor_msgs::PointCloud2>("crop_bin_F", 1);
     m_shelf_G_pub =
             m_nh.advertise<sensor_msgs::PointCloud2>("crop_bin_G", 1);
     m_shelf_H_pub =
@@ -122,7 +124,7 @@ class CropTool {
                     const sensor_msgs::ImageConstPtr& rgb_msg,
                     const sensor_msgs::CameraInfoConstPtr& rgb_info_msg) {
 
-    ROS_INFO("Received full optional kinect data :)");
+    //ROS_INFO("Received full optional kinect data :)");
 
     image_geometry::PinholeCameraModel model;
     model.fromCameraInfo(rgb_info_msg);
@@ -176,8 +178,12 @@ class CropTool {
     if(!m_crop_requested)
         return;
 
+    ROS_INFO("Cropping...");
+
     debugCropping();
     m_crop_requested = false;
+
+    ROS_INFO("Cropped");
 
   }
 
@@ -275,9 +281,11 @@ class CropTool {
   }
 
   void publishCloud() {
-    sensor_msgs::PointCloud2 cloud, a,b,c,d,e,f,g,h,i,j,k,l;
+    sensor_msgs::PointCloud2 rgb,cloud, a,b,c,d,e,f,g,h,i,j,k,l;
     pcl::toROSMsg(m_label_cloud, cloud);
     m_cloud_publisher.publish(cloud);
+    pcl::toROSMsg(m_rgbd_cloud, rgb);
+    m_rgbd_publisher.publish(rgb);
     pcl::toROSMsg(m_bin_A_cloud, a);
     pcl::toROSMsg(m_bin_B_cloud, b);
     pcl::toROSMsg(m_bin_C_cloud, c);
