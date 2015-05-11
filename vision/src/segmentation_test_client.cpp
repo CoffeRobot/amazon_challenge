@@ -153,6 +153,29 @@ class SegmenterTestClient {
     cropCloud(in, min_x, max_x, min_y, max_y, min_z, max_z, out);
   }
 
+  void cropCloudBin(string bin_name, const pcl::PointCloud<pcl::PointXYZ>::Ptr& in,
+                    pcl::PointCloud<pcl::PointXYZ>::Ptr& out) {
+    tf::StampedTransform transform;
+    if (!getTimedTransform(m_tf_listener, "base_footprint", bin_name, 2.0f,
+                           transform)) {
+      ROS_WARN("Timeout in getting transform");
+      return;
+    }
+    Eigen::Vector3f size = getBinSize(bin_name);
+
+    auto origin = transform.getOrigin();
+
+    float min_x = origin.x() + 0.02;
+    float max_x = origin.x() + size.x() - 0.02;
+    float min_y = origin.y() + 0.02;
+    float max_y = origin.y() + size.y() - 0.02;
+    float min_z = origin.z() + 0.01;
+    float max_z = origin.z() + size.z() - 0.04f;
+
+    cropCloud(in, min_x, max_x, min_y, max_y, min_z, max_z, out);
+  }
+
+
   void debugBin(string bin_name, pcl::PointCloud<pcl::PointXYZRGB>& out)
   {
       auto cloud_ptr = m_colored_cloud.makeShared();

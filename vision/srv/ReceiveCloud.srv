@@ -1,3 +1,5 @@
 sensor_msgs/PointCloud2 cloud
+sensor_msgs/PointCloud2 rgb_cloud
+bool stop_publish
 ---
 bool result
