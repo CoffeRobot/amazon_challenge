@@ -52,7 +52,7 @@ namespace amazon_challenge {
 class CropTool {
 
  public:
-  CropTool() : m_nh() {
+  CropTool() : m_nh(), m_tf_listener() {
 
     m_depth_it.reset(new image_transport::ImageTransport(m_nh));
     m_sub_depth.subscribe(
@@ -73,47 +73,32 @@ class CropTool {
         m_nh.advertise<sensor_msgs::PointCloud2>("crop_label_cloud", 1);
     m_rgbd_publisher =
         m_nh.advertise<sensor_msgs::PointCloud2>("crop_rgbd_cloud", 1);
-    m_shelf_A_pub =
-            m_nh.advertise<sensor_msgs::PointCloud2>("crop_bin_A", 1);
-    m_shelf_B_pub =
-            m_nh.advertise<sensor_msgs::PointCloud2>("crop_bin_B", 1);
-    m_shelf_C_pub =
-            m_nh.advertise<sensor_msgs::PointCloud2>("crop_bin_C", 1);
-    m_shelf_D_pub =
-            m_nh.advertise<sensor_msgs::PointCloud2>("crop_bin_D", 1);
-    m_shelf_E_pub =
-            m_nh.advertise<sensor_msgs::PointCloud2>("crop_bin_E", 1);
-    m_shelf_F_pub =
-            m_nh.advertise<sensor_msgs::PointCloud2>("crop_bin_F", 1);
-    m_shelf_G_pub =
-            m_nh.advertise<sensor_msgs::PointCloud2>("crop_bin_G", 1);
-    m_shelf_H_pub =
-            m_nh.advertise<sensor_msgs::PointCloud2>("crop_bin_H", 1);
-    m_shelf_I_pub =
-            m_nh.advertise<sensor_msgs::PointCloud2>("crop_bin_I", 1);
-    m_shelf_J_pub =
-            m_nh.advertise<sensor_msgs::PointCloud2>("crop_bin_J", 1);
-    m_shelf_K_pub =
-            m_nh.advertise<sensor_msgs::PointCloud2>("crop_bin_K", 1);
-    m_shelf_L_pub =
-            m_nh.advertise<sensor_msgs::PointCloud2>("crop_bin_L", 1);
+    m_shelf_A_pub = m_nh.advertise<sensor_msgs::PointCloud2>("crop_bin_A", 1);
+    m_shelf_B_pub = m_nh.advertise<sensor_msgs::PointCloud2>("crop_bin_B", 1);
+    m_shelf_C_pub = m_nh.advertise<sensor_msgs::PointCloud2>("crop_bin_C", 1);
+    m_shelf_D_pub = m_nh.advertise<sensor_msgs::PointCloud2>("crop_bin_D", 1);
+    m_shelf_E_pub = m_nh.advertise<sensor_msgs::PointCloud2>("crop_bin_E", 1);
+    m_shelf_F_pub = m_nh.advertise<sensor_msgs::PointCloud2>("crop_bin_F", 1);
+    m_shelf_G_pub = m_nh.advertise<sensor_msgs::PointCloud2>("crop_bin_G", 1);
+    m_shelf_H_pub = m_nh.advertise<sensor_msgs::PointCloud2>("crop_bin_H", 1);
+    m_shelf_I_pub = m_nh.advertise<sensor_msgs::PointCloud2>("crop_bin_I", 1);
+    m_shelf_J_pub = m_nh.advertise<sensor_msgs::PointCloud2>("crop_bin_J", 1);
+    m_shelf_K_pub = m_nh.advertise<sensor_msgs::PointCloud2>("crop_bin_K", 1);
+    m_shelf_L_pub = m_nh.advertise<sensor_msgs::PointCloud2>("crop_bin_L", 1);
 
-    m_service_server = m_nh.advertiseService(
-        "crop_cloud", &CropTool::serviceCallback, this);
+    m_service_server =
+        m_nh.advertiseService("crop_cloud", &CropTool::serviceCallback, this);
 
     m_front_crop = 0.03;
     m_back_crop = 0.04;
-    m_top_crop = 0.04;
+    m_top_crop = 0.01;
     m_bottom_crop = 0.01;
     m_left_crop = 0.03;
     m_right_crop = 0.03;
-
-
   };
 
   bool serviceCallback(vision::CropShelf::Request& req,
-                       vision::CropShelf::Response& res)
-  {
+                       vision::CropShelf::Response& res) {
     m_crop_requested = true;
 
     res.result = true;
@@ -124,7 +109,7 @@ class CropTool {
                     const sensor_msgs::ImageConstPtr& rgb_msg,
                     const sensor_msgs::CameraInfoConstPtr& rgb_info_msg) {
 
-    //ROS_INFO("Received full optional kinect data :)");
+    // ROS_INFO("Received full optional kinect data :)");
 
     image_geometry::PinholeCameraModel model;
     model.fromCameraInfo(rgb_info_msg);
@@ -175,29 +160,52 @@ class CropTool {
       }
     }
 
-    if(!m_crop_requested)
-        return;
+    if (!m_crop_requested) return;
+
+    sensor_msgs::PointCloud2 tmp_cloud;
+    pcl::toROSMsg(m_rgbd_cloud, tmp_cloud);
+    sensor_msgs::PointCloud2 out;
+    pcl_ros::transformPointCloud("base_footprint", tmp_cloud, out,
+                                 m_tf_listener);
+    pcl::fromROSMsg(out, m_rgbd_cloud);
 
     ROS_INFO("Cropping...");
 
-    debugCropping();
+   // debugCropping();
+
+    pcl::copyPointCloud(m_rgbd_cloud, m_label_cloud);
+    colorCloud();
+    ROS_INFO(m_label_cloud.header.frame_id.c_str());
+
     m_crop_requested = false;
 
     ROS_INFO("Cropped");
-
   }
 
-  void cropCloudBin(string bin_name, const pcl::PointCloud<pcl::PointXYZRGB>::Ptr& in,
-                    pcl::PointCloud<pcl::PointXYZRGB>::Ptr& out) {
+  void colorCloud()
+  {
+    //colorBinPoints("shelf_bin_A");
+    //colorBinPoints("shelf_bin_B");
+    //colorBinPoints("shelf_bin_C");
+    //colorBinPoints("shelf_bin_D");
+    //colorBinPoints("shelf_bin_E");
+    //colorBinPoints("shelf_bin_F");
+    //colorBinPoints("shelf_bin_G");
+    //colorBinPoints("shelf_bin_H");
+    //colorBinPoints("shelf_bin_I");
+    colorBinPoints("shelf_bin_J");
+    colorBinPoints("shelf_bin_K");
+    colorBinPoints("shelf_bin_L");
+  }
+
+  void colorBinPoints(string bin_name) {
     tf::StampedTransform transform;
     if (!getTimedTransform(m_tf_listener, "base_footprint", bin_name, 2.0f,
                            transform)) {
       return;
     }
     Eigen::Vector3f size = getBinSize(bin_name);
-
     auto origin = transform.getOrigin();
-
     float min_x = origin.x() + m_front_crop;
     float max_x = origin.x() + size.x() - m_back_crop;
     float min_y = origin.y() + m_right_crop;
@@ -205,41 +213,67 @@ class CropTool {
     float min_z = origin.z() + m_bottom_crop;
     float max_z = origin.z() + size.z() - m_top_crop;
 
-    cropCloud(in, min_x, max_x, min_y, max_y, min_z, max_z, out);
+    Eigen::Vector3i color = getBinColor(bin_name);
+    for (pcl::PointXYZRGB& p : m_label_cloud.points) {
+      if (p.x > min_x && p.x < max_x && p.y > min_y && p.y < max_y &&
+          p.z > min_z && p.z < max_z) {
+        p.r = color.x();
+        p.g = color.y();
+        p.b = color.z();
+      }
+    }
   }
 
+  void cropCloudBin(string bin_name,
+                    const pcl::PointCloud<pcl::PointXYZRGB>::Ptr& in,
+                    pcl::PointCloud<pcl::PointXYZRGB>::Ptr& out) {
+    tf::StampedTransform transform;
+    if (!getTimedTransform(m_tf_listener, "base_footprint", "shelf_bin_A", 2.0f,
+                           transform)) {
+      return;
+    }
+    Eigen::Vector3f size = getBinSize("shelf_bin_A");
+
+    auto origin = transform.getOrigin();
+    float min_x = origin.x() + m_front_crop;
+    float max_x = origin.x() + size.x() - m_back_crop;
+    float min_y = origin.y() + m_right_crop;
+    float max_y = origin.y() + size.y() - m_left_crop;
+    float min_z = origin.z() + m_bottom_crop;
+    float max_z = origin.z() + size.z() - m_top_crop;
+
+  }
 
   void debugBin(string bin_name, pcl::PointCloud<pcl::PointXYZRGB>& out_rgb,
-                pcl::PointCloud<pcl::PointXYZRGB>& out_label)
-  {
-      auto cloud_ptr = m_rgbd_cloud.makeShared();
-      auto out_ptr = out_rgb.makeShared();
-      cropCloudBin(bin_name, cloud_ptr, out_ptr);
-      Eigen::Vector3i color = getBinColor(bin_name);
-      out_label = out_rgb;
-      for(pcl::PointXYZRGB& p : out_label.points)
-      {
-          p.r = color.x();
-          p.g = color.y();
-          p.b = color.z();
-      }
-
+                pcl::PointCloud<pcl::PointXYZRGB>& out_label) {
+    auto cloud_ptr = m_rgbd_cloud.makeShared();
+    auto out_ptr = out_rgb.makeShared();
+    cropCloudBin(bin_name, cloud_ptr, out_ptr);
+    Eigen::Vector3i color = getBinColor(bin_name);
+    out_label = out_rgb;
+    for (pcl::PointXYZRGB& p : out_label.points) {
+      p.r = color.x();
+      p.g = color.y();
+      p.b = color.z();
+    }
   }
 
-  void debugCropping()
-  {
+  void debugCropping() {
     m_label_cloud.points.clear();
     pcl::PointCloud<pcl::PointXYZRGB> out;
 
     m_bin_A_cloud.points.clear();
+    m_bin_A_cloud.header.frame_id = m_rgbd_cloud.header.frame_id;
     debugBin("shelf_bin_A", m_bin_A_cloud, out);
     m_label_cloud += out;
 
     m_bin_B_cloud.points.clear();
+    m_bin_B_cloud.header.frame_id = m_rgbd_cloud.header.frame_id;
     debugBin("shelf_bin_B", m_bin_B_cloud, out);
     m_label_cloud += out;
 
     m_bin_C_cloud.points.clear();
+    m_bin_C_cloud.header.frame_id = m_rgbd_cloud.header.frame_id;
     debugBin("shelf_bin_C", m_bin_C_cloud, out);
     m_label_cloud += out;
 
@@ -281,7 +315,7 @@ class CropTool {
   }
 
   void publishCloud() {
-    sensor_msgs::PointCloud2 rgb,cloud, a,b,c,d,e,f,g,h,i,j,k,l;
+    sensor_msgs::PointCloud2 rgb, cloud, a, b, c, d, e, f, g, h, i, j, k, l;
     pcl::toROSMsg(m_label_cloud, cloud);
     m_cloud_publisher.publish(cloud);
     pcl::toROSMsg(m_rgbd_cloud, rgb);
@@ -312,12 +346,10 @@ class CropTool {
     m_shelf_L_pub.publish(l);
   }
 
-
   float m_left_crop, m_right_crop, m_bottom_crop, m_top_crop, m_front_crop,
-  m_back_crop;
+      m_back_crop;
 
-private:
-
+ private:
   ros::NodeHandle m_nh;
   boost::shared_ptr<image_transport::ImageTransport> m_rgb_it, m_depth_it;
   image_transport::SubscriberFilter m_sub_depth, m_sub_rgb;
@@ -332,15 +364,16 @@ private:
   sensor_msgs::CameraInfo m_camera_info_msg;
 
   pcl::PointCloud<pcl::PointXYZRGB> m_bin_A_cloud, m_bin_B_cloud, m_bin_C_cloud,
-  m_bin_D_cloud, m_bin_E_cloud,m_bin_F_cloud, m_bin_G_cloud, m_bin_H_cloud,
-  m_bin_I_cloud, m_bin_J_cloud, m_bin_K_cloud, m_bin_L_cloud, m_rgbd_cloud, m_label_cloud;
+      m_bin_D_cloud, m_bin_E_cloud, m_bin_F_cloud, m_bin_G_cloud, m_bin_H_cloud,
+      m_bin_I_cloud, m_bin_J_cloud, m_bin_K_cloud, m_bin_L_cloud, m_rgbd_cloud,
+      m_label_cloud;
 
   ros::ServiceServer m_service_server;
 
-  ros::Publisher m_cloud_publisher, m_shelf_A_pub, m_shelf_B_pub,
-  m_shelf_C_pub, m_shelf_D_pub, m_shelf_E_pub, m_shelf_F_pub, m_shelf_G_pub,
-  m_shelf_H_pub, m_shelf_I_pub, m_shelf_J_pub, m_shelf_K_pub, m_shelf_L_pub,
-  m_rgbd_publisher;
+  ros::Publisher m_cloud_publisher, m_shelf_A_pub, m_shelf_B_pub, m_shelf_C_pub,
+      m_shelf_D_pub, m_shelf_E_pub, m_shelf_F_pub, m_shelf_G_pub, m_shelf_H_pub,
+      m_shelf_I_pub, m_shelf_J_pub, m_shelf_K_pub, m_shelf_L_pub,
+      m_rgbd_publisher;
 
   tf::TransformListener m_tf_listener;
 
