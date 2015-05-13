@@ -106,13 +106,18 @@ void depthToCloud(const sensor_msgs::ImageConstPtr& depth_msg,
 }
 
 Eigen::Vector3f getBinSize(std::string bin_name) {
-  if (bin_name.compare("bin_A") == 0 || bin_name.compare("bin_C") == 0 ||
-      bin_name.compare("bin_J") == 0 || bin_name.compare("bin_L") == 0) {
+  if (bin_name.compare("shelf_bin_A") == 0 ||
+      bin_name.compare("shelf_bin_C") == 0 ||
+      bin_name.compare("shelf_bin_J") == 0 ||
+      bin_name.compare("shelf_bin_L") == 0) {
     return Eigen::Vector3f(0.42, 0.27, 0.24);
-  } else if (bin_name.compare("bin_D") == 0 || bin_name.compare("bin_F") == 0 ||
-             bin_name.compare("bin_G") == 0 || bin_name.compare("bin_I") == 0) {
+  } else if (bin_name.compare("shelf_bin_D") == 0 ||
+             bin_name.compare("shelf_bin_F") == 0 ||
+             bin_name.compare("shelf_bin_G") == 0 ||
+             bin_name.compare("shelf_bin_I") == 0) {
     return Eigen::Vector3f(0.42, 0.27, 0.22);
-  } else if (bin_name.compare("bin_B") == 0 || bin_name.compare("bin_K") == 0) {
+  } else if (bin_name.compare("shelf_bin_B") == 0 ||
+             bin_name.compare("shelf_bin_K") == 0) {
     return Eigen::Vector3f(0.42, 0.30, 0.22);
   } else {
     return Eigen::Vector3f(0.42, 0.30, 0.24);
@@ -120,18 +125,21 @@ Eigen::Vector3f getBinSize(std::string bin_name) {
 }
 
 Eigen::Vector3i getBinColor(std::string bin_name) {
-  if (bin_name.compare("bin_A") == 0) return Eigen::Vector3i(255, 0, 0);
-  if (bin_name.compare("bin_B") == 0) return Eigen::Vector3i(0, 255, 0);
-  if (bin_name.compare("bin_C") == 0) return Eigen::Vector3i(0, 0, 255);
-  if (bin_name.compare("bin_D") == 0) return Eigen::Vector3i(0, 255, 255);
-  if (bin_name.compare("bin_E") == 0) return Eigen::Vector3i(255, 0, 255);
-  if (bin_name.compare("bin_F") == 0) return Eigen::Vector3i(255, 255, 0);
-  if (bin_name.compare("bin_G") == 0) return Eigen::Vector3i(255, 0, 0);
-  if (bin_name.compare("bin_H") == 0) return Eigen::Vector3i(0, 255, 0);
-  if (bin_name.compare("bin_I") == 0) return Eigen::Vector3i(0, 0, 255);
-  if (bin_name.compare("bin_J") == 0) return Eigen::Vector3i(0, 255, 255);
-  if (bin_name.compare("bin_K") == 0) return Eigen::Vector3i(255, 0, 255);
-  if (bin_name.compare("bin_L") == 0) return Eigen::Vector3i(255, 255, 0);
+  if (bin_name.compare("shelf_bin_A") == 0) return Eigen::Vector3i(255, 0, 0);
+  if (bin_name.compare("shelf_bin_B") == 0) return Eigen::Vector3i(0, 255, 0);
+  if (bin_name.compare("shelf_bin_C") == 0) return Eigen::Vector3i(0, 0, 255);
+  if (bin_name.compare("shelf_bin_D") == 0) return Eigen::Vector3i(0, 255, 255);
+  if (bin_name.compare("shelf_bin_E") == 0) return Eigen::Vector3i(255, 0, 255);
+  if (bin_name.compare("shelf_bin_F") == 0) return Eigen::Vector3i(255, 255, 0);
+  if (bin_name.compare("shelf_bin_G") == 0) return Eigen::Vector3i(255, 0, 0);
+  if (bin_name.compare("shelf_bin_H") == 0) return Eigen::Vector3i(0, 255, 0);
+  if (bin_name.compare("shelf_bin_I") == 0) return Eigen::Vector3i(0, 0, 255);
+  if (bin_name.compare("shelf_bin_J") == 0) return Eigen::Vector3i(0, 255, 255);
+  if (bin_name.compare("shelf_bin_K") == 0) return Eigen::Vector3i(255, 0, 255);
+  if (bin_name.compare("shelf_bin_L") == 0)
+    return Eigen::Vector3i(255, 255, 0);
+  else
+    return Eigen::Vector3i(255, 255, 255);
 }
 
 void colorCloudWithBin(std::string bin_name, tf::Vector3& origin,
@@ -186,22 +194,22 @@ void cropCloud(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_ptr,
   pass.setInputCloud(cloud_ptr);
 
   std::stringstream ss;
-  ss << "x: " << cloud_ptr->points.size() << " " << min_x << " " << max_x;
+  //ss << "x: " << cloud_ptr->points.size() << " " << min_x << " " << max_x;
   pass.setFilterFieldName("x");
   pass.setFilterLimits(min_x, max_x);
   pass.filter(*cropped);
-  ss << " y: " << cropped->points.size() << " " << min_y << " " << max_y;
+  //ss << " y: " << cropped->points.size() << " " << min_y << " " << max_y;
   pass.setInputCloud(cropped);
   pass.setFilterFieldName("y");
   pass.setFilterLimits(min_y, max_y);
   pass.filter(*cropped);
-  ss << " z: " << cropped->points.size() << " " << min_z << " " << max_z;
+  //ss << " z: " << cropped->points.size() << " " << min_z << " " << max_z;
   pass.setInputCloud(cropped);
   pass.setFilterFieldName("z");
   pass.setFilterLimits(min_z, max_z);
-  //pass.filter(*cropped);
-  ss << " f: " << cropped->points.size();
-  ROS_INFO(ss.str().c_str());
+  pass.filter(*cropped);
+  //ss << " f: " << cropped->points.size();
+  //ROS_INFO(ss.str().c_str());
 }
 
 bool getTimedTransform(const tf::TransformListener& listener,

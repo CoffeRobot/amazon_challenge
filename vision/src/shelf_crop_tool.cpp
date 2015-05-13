@@ -52,17 +52,47 @@ namespace amazon_challenge {
 class CropTool {
 
  public:
-  CropTool() : m_nh(), m_tf_listener() {
+  CropTool()
+      : m_nh(),
+        m_tf_listener(),
+        m_bin_A_cloud(new pcl::PointCloud<pcl::PointXYZRGB>),
+        m_bin_B_cloud(new pcl::PointCloud<pcl::PointXYZRGB>),
+        m_bin_C_cloud(new pcl::PointCloud<pcl::PointXYZRGB>),
+        m_bin_D_cloud(new pcl::PointCloud<pcl::PointXYZRGB>),
+        m_bin_E_cloud(new pcl::PointCloud<pcl::PointXYZRGB>),
+        m_bin_F_cloud(new pcl::PointCloud<pcl::PointXYZRGB>),
+        m_bin_G_cloud(new pcl::PointCloud<pcl::PointXYZRGB>),
+        m_bin_H_cloud(new pcl::PointCloud<pcl::PointXYZRGB>),
+        m_bin_I_cloud(new pcl::PointCloud<pcl::PointXYZRGB>),
+        m_bin_J_cloud(new pcl::PointCloud<pcl::PointXYZRGB>),
+        m_bin_K_cloud(new pcl::PointCloud<pcl::PointXYZRGB>),
+        m_bin_L_cloud(new pcl::PointCloud<pcl::PointXYZRGB>),
+        m_rgbd_cloud(new pcl::PointCloud<pcl::PointXYZRGB>),
+        m_label_cloud(new pcl::PointCloud<pcl::PointXYZRGB>),
+        m_first_received(false) {
 
     m_depth_it.reset(new image_transport::ImageTransport(m_nh));
-    m_sub_depth.subscribe(
+    m_rgb_it.reset(new image_transport::ImageTransport(m_nh));
+    m_sub_rgb_info.subscribe(m_nh, "/head_mount_kinect/rgb/camera_info", 1);
+    /****************************** topics for simulator *******************/
+    m_sub_depth.subscribe(*m_depth_it, "/head_mount_kinect/depth/image_raw", 1,
+                          image_transport::TransportHints("raw"));
+    m_sub_rgb.subscribe(*m_rgb_it, "/head_mount_kinect/rgb/image_raw", 1,
+                        image_transport::TransportHints("compressed"));
+
+
+    /****************************** topics for pr2 *************************/
+    /*m_sub_depth.subscribe(
         *m_depth_it,
         "/head_mount_kinect/depth_registered/sw_registered/image_rect_raw", 1,
-        image_transport::TransportHints("compressedDepth"));
-    m_rgb_it.reset(new image_transport::ImageTransport(m_nh));
-    m_sub_rgb.subscribe(*m_rgb_it, "/head_mount_kinect/rgb/image_rect_color", 1,
-                        image_transport::TransportHints("compressed"));
-    m_sub_rgb_info.subscribe(m_nh, "/head_mount_kinect/rgb/camera_info", 1);
+        image_transport::TransportHints("compressedDepth"));*/
+
+
+    /*m_sub_rgb.subscribe(*m_rgb_it, "/head_mount_kinect/rgb/image_rect_color",
+       1,
+                        image_transport::TransportHints("compressed"));*/
+
+
 
     m_sync_rgbd.reset(new SynchronizerRGBD(SyncPolicyRGBD(5), m_sub_depth,
                                            m_sub_rgb, m_sub_rgb_info));
@@ -92,45 +122,37 @@ class CropTool {
     getParams();
   };
 
-  void getParams()
-  {
-      ros::NodeHandle nh = ros::NodeHandle();
-      if(!nh.getParam("/segmentation/front_crop", (double&)m_front_crop))
-      {
-          ROS_WARN("Loading default front_crop segmentation param");
-          m_front_crop = 0.03;
-      }
+  void getParams() {
+    ros::NodeHandle nh = ros::NodeHandle();
+    if (!nh.getParam("/segmentation/front_crop", (double&)m_front_crop)) {
+      ROS_WARN("Loading default front_crop segmentation param");
+      m_front_crop = 0.03;
+    }
 
-      if(!nh.getParam("/segmentation/back_crop", (double&)m_back_crop))
-      {
-          ROS_WARN("Loading default back_crop segmentation param");
-          m_back_crop = 0.04;
-      }
+    if (!nh.getParam("/segmentation/back_crop", (double&)m_back_crop)) {
+      ROS_WARN("Loading default back_crop segmentation param");
+      m_back_crop = 0.04;
+    }
 
-      if(!nh.getParam("/segmentation/top_crop", (double&)m_top_crop))
-      {
-          ROS_WARN("Loading default top_crop segmentation param");
-          m_top_crop = 0.04;
-      }
+    if (!nh.getParam("/segmentation/top_crop", (double&)m_top_crop)) {
+      ROS_WARN("Loading default top_crop segmentation param");
+      m_top_crop = 0.03;
+    }
 
-      if(!nh.getParam("/segmentation/bottom_crop", (double&)m_bottom_crop))
-      {
-          ROS_WARN("Loading default bottom_crop segmentation param");
-          m_bottom_crop = 0.01;
-      }
+    if (!nh.getParam("/segmentation/bottom_crop", (double&)m_bottom_crop)) {
+      ROS_WARN("Loading default bottom_crop segmentation param");
+      m_bottom_crop = 0.01;
+    }
 
-      if(!nh.getParam("/segmentation/left_crop", (double&)m_left_crop))
-      {
-          ROS_WARN("Loading default left_crop segmentation param");
-          m_left_crop = 0.03;
-      }
+    if (!nh.getParam("/segmentation/left_crop", (double&)m_left_crop)) {
+      ROS_WARN("Loading default left_crop segmentation param");
+      m_left_crop = 0.02;
+    }
 
-      if(!nh.getParam("/segmentation/right_crop", (double&)m_right_crop))
-      {
-          ROS_WARN("Loading default right_crop segmentation param");
-          m_right_crop = 0.03;
-      }
-
+    if (!nh.getParam("/segmentation/right_crop", (double&)m_right_crop)) {
+      ROS_WARN("Loading default right_crop segmentation param");
+      m_right_crop = 0.02;
+    }
   }
 
   bool serviceCallback(vision::CropShelf::Request& req,
@@ -146,6 +168,8 @@ class CropTool {
                     const sensor_msgs::CameraInfoConstPtr& rgb_info_msg) {
 
     // ROS_INFO("Received full optional kinect data :)");
+
+    if (!m_crop_requested) return;
 
     image_geometry::PinholeCameraModel model;
     model.fromCameraInfo(rgb_info_msg);
@@ -164,11 +188,11 @@ class CropTool {
     }
 
     cloud_msg->header.frame_id = rgb_msg->header.frame_id;
-    m_label_cloud.header.frame_id = rgb_msg->header.frame_id;
+    m_label_cloud->header.frame_id = rgb_msg->header.frame_id;
 
     pcl::PointCloud<pcl::PointXYZ> cloud;
     pcl::fromROSMsg(*cloud_msg, cloud);
-    pcl::copyPointCloud(cloud, m_rgbd_cloud);
+    pcl::copyPointCloud(cloud, *m_rgbd_cloud);
 
     cv_bridge::CvImageConstPtr cv_ptr;
     try {
@@ -180,8 +204,8 @@ class CropTool {
       return;
     }
 
-    auto w = m_rgbd_cloud.width;
-    auto h = m_rgbd_cloud.height;
+    auto w = m_rgbd_cloud->width;
+    auto h = m_rgbd_cloud->height;
 
     const cv::Mat& img = cv_ptr->image;
 
@@ -189,46 +213,43 @@ class CropTool {
       for (auto col = 0; col < w; ++col) {
         auto id = col + w * row;
         cv::Vec3b rgb = img.at<cv::Vec3b>(row, col);
-        pcl::PointXYZRGB& p = m_rgbd_cloud.points[id];
+        pcl::PointXYZRGB& p = m_rgbd_cloud->points[id];
         p.r = rgb.val[2];
         p.g = rgb.val[1];
         p.b = rgb.val[0];
       }
     }
 
-    if (!m_crop_requested) return;
-
     sensor_msgs::PointCloud2 tmp_cloud;
-    pcl::toROSMsg(m_rgbd_cloud, tmp_cloud);
+    pcl::toROSMsg(*m_rgbd_cloud, tmp_cloud);
     sensor_msgs::PointCloud2 out;
     pcl_ros::transformPointCloud("base_footprint", tmp_cloud, out,
                                  m_tf_listener);
-    pcl::fromROSMsg(out, m_rgbd_cloud);
+    pcl::fromROSMsg(out, *m_rgbd_cloud);
 
     ROS_INFO("Cropping...");
 
-   // debugCropping();
-
-    pcl::copyPointCloud(m_rgbd_cloud, m_label_cloud);
+    pcl::copyPointCloud(*m_rgbd_cloud, *m_label_cloud);
+    debugCropping();
     colorCloud();
-    ROS_INFO(m_label_cloud.header.frame_id.c_str());
+    ROS_INFO(m_label_cloud->header.frame_id.c_str());
 
     m_crop_requested = false;
 
     ROS_INFO("Cropped");
+    m_first_received = true;
   }
 
-  void colorCloud()
-  {
-    //colorBinPoints("shelf_bin_A");
-    //colorBinPoints("shelf_bin_B");
-    //colorBinPoints("shelf_bin_C");
-    //colorBinPoints("shelf_bin_D");
-    //colorBinPoints("shelf_bin_E");
-    //colorBinPoints("shelf_bin_F");
-    //colorBinPoints("shelf_bin_G");
-    //colorBinPoints("shelf_bin_H");
-    //colorBinPoints("shelf_bin_I");
+  void colorCloud() {
+    colorBinPoints("shelf_bin_A");
+    colorBinPoints("shelf_bin_B");
+    colorBinPoints("shelf_bin_C");
+    colorBinPoints("shelf_bin_D");
+    colorBinPoints("shelf_bin_E");
+    colorBinPoints("shelf_bin_F");
+    colorBinPoints("shelf_bin_G");
+    colorBinPoints("shelf_bin_H");
+    colorBinPoints("shelf_bin_I");
     colorBinPoints("shelf_bin_J");
     colorBinPoints("shelf_bin_K");
     colorBinPoints("shelf_bin_L");
@@ -252,12 +273,15 @@ class CropTool {
     float max_z = origin.z() + size.z() - m_top_crop;
 
     Eigen::Vector3i color = getBinColor(bin_name);
-    for (pcl::PointXYZRGB& p : m_label_cloud.points) {
+
+    int count = 0;
+    for (pcl::PointXYZRGB& p : m_label_cloud->points) {
       if (p.x > min_x && p.x < max_x && p.y > min_y && p.y < max_y &&
           p.z > min_z && p.z < max_z) {
         p.r = color.x();
         p.g = color.y();
         p.b = color.z();
+        count++;
       }
     }
   }
@@ -266,11 +290,11 @@ class CropTool {
                     const pcl::PointCloud<pcl::PointXYZRGB>::Ptr& in,
                     pcl::PointCloud<pcl::PointXYZRGB>::Ptr& out) {
     tf::StampedTransform transform;
-    if (!getTimedTransform(m_tf_listener, "base_footprint", "shelf_bin_A", 2.0f,
+    if (!getTimedTransform(m_tf_listener, "base_footprint", bin_name, 2.0f,
                            transform)) {
       return;
     }
-    Eigen::Vector3f size = getBinSize("shelf_bin_A");
+    Eigen::Vector3f size = getBinSize(bin_name);
 
     auto origin = transform.getOrigin();
     float min_x = origin.x() + m_front_crop;
@@ -280,96 +304,98 @@ class CropTool {
     float min_z = origin.z() + m_bottom_crop;
     float max_z = origin.z() + size.z() - m_top_crop;
 
+    cropCloud(in, min_x, max_x, min_y, max_y, min_z, max_z, out);
+
+    /*stringstream ss;
+    ss << bin_name << " in " << in->points.size() << " out "
+       << out->points.size();
+    ROS_INFO(ss.str().c_str());*/
   }
 
-  void debugBin(string bin_name, pcl::PointCloud<pcl::PointXYZRGB>& out_rgb,
+  void debugBin(string bin_name,
+                pcl::PointCloud<pcl::PointXYZRGB>::Ptr& out_rgb,
                 pcl::PointCloud<pcl::PointXYZRGB>& out_label) {
-    auto cloud_ptr = m_rgbd_cloud.makeShared();
-    auto out_ptr = out_rgb.makeShared();
-    cropCloudBin(bin_name, cloud_ptr, out_ptr);
-    Eigen::Vector3i color = getBinColor(bin_name);
-    out_label = out_rgb;
-    for (pcl::PointXYZRGB& p : out_label.points) {
-      p.r = color.x();
-      p.g = color.y();
-      p.b = color.z();
-    }
+    cropCloudBin(bin_name, m_label_cloud, out_rgb);
+
+    /*stringstream ss;
+    ss << "->" << bin_name << " in " << m_label_cloud->points.size() << " out "
+       << out_rgb->points.size();
+    ROS_INFO(ss.str().c_str());*/
   }
 
   void debugCropping() {
-    m_label_cloud.points.clear();
+
     pcl::PointCloud<pcl::PointXYZRGB> out;
-
-    m_bin_A_cloud.points.clear();
-    m_bin_A_cloud.header.frame_id = m_rgbd_cloud.header.frame_id;
+    m_bin_A_cloud->points.clear();
+    m_bin_A_cloud->header.frame_id = "base_footprint";
     debugBin("shelf_bin_A", m_bin_A_cloud, out);
-    m_label_cloud += out;
 
-    m_bin_B_cloud.points.clear();
-    m_bin_B_cloud.header.frame_id = m_rgbd_cloud.header.frame_id;
+    m_bin_B_cloud->points.clear();
+    m_bin_B_cloud->header.frame_id = "base_footprint";
     debugBin("shelf_bin_B", m_bin_B_cloud, out);
-    m_label_cloud += out;
 
-    m_bin_C_cloud.points.clear();
-    m_bin_C_cloud.header.frame_id = m_rgbd_cloud.header.frame_id;
+    m_bin_C_cloud->points.clear();
+    m_bin_C_cloud->header.frame_id = "base_footprint";
     debugBin("shelf_bin_C", m_bin_C_cloud, out);
-    m_label_cloud += out;
 
-    m_bin_D_cloud.points.clear();
+    m_bin_D_cloud->points.clear();
+    m_bin_D_cloud->header.frame_id = "base_footprint";
     debugBin("shelf_bin_D", m_bin_D_cloud, out);
-    m_label_cloud += out;
 
-    m_bin_E_cloud.points.clear();
+    m_bin_E_cloud->points.clear();
+    m_bin_E_cloud->header.frame_id = "base_footprint";
     debugBin("shelf_bin_E", m_bin_E_cloud, out);
-    m_label_cloud += out;
 
-    m_bin_F_cloud.points.clear();
+    m_bin_F_cloud->points.clear();
+    m_bin_F_cloud->header.frame_id = "base_footprint";
     debugBin("shelf_bin_F", m_bin_F_cloud, out);
-    m_label_cloud += out;
 
-    m_bin_G_cloud.points.clear();
+    m_bin_G_cloud->points.clear();
+    m_bin_G_cloud->header.frame_id = "base_footprint";
     debugBin("shelf_bin_G", m_bin_G_cloud, out);
-    m_label_cloud += out;
 
-    m_bin_H_cloud.points.clear();
+    m_bin_H_cloud->points.clear();
+    m_bin_H_cloud->header.frame_id = "base_footprint";
     debugBin("shelf_bin_H", m_bin_H_cloud, out);
-    m_label_cloud += out;
 
-    m_bin_I_cloud.points.clear();
+    m_bin_I_cloud->points.clear();
+    m_bin_I_cloud->header.frame_id = "base_footprint";
     debugBin("shelf_bin_I", m_bin_I_cloud, out);
-    m_label_cloud += out;
 
-    m_bin_J_cloud.points.clear();
+    m_bin_J_cloud->points.clear();
+    m_bin_J_cloud->header.frame_id = "base_footprint";
     debugBin("shelf_bin_J", m_bin_J_cloud, out);
-    m_label_cloud += out;
 
-    m_bin_K_cloud.points.clear();
+    m_bin_K_cloud->points.clear();
+    m_bin_K_cloud->header.frame_id = "base_footprint";
     debugBin("shelf_bin_K", m_bin_K_cloud, out);
-    m_label_cloud += out;
 
-    m_bin_L_cloud.points.clear();
+    m_bin_L_cloud->points.clear();
+    m_bin_L_cloud->header.frame_id = "base_footprint";
     debugBin("shelf_bin_L", m_bin_L_cloud, out);
-    m_label_cloud += out;
   }
 
   void publishCloud() {
+
+    if (!m_first_received) return;
+
     sensor_msgs::PointCloud2 rgb, cloud, a, b, c, d, e, f, g, h, i, j, k, l;
-    pcl::toROSMsg(m_label_cloud, cloud);
+    pcl::toROSMsg(*m_label_cloud, cloud);
     m_cloud_publisher.publish(cloud);
-    pcl::toROSMsg(m_rgbd_cloud, rgb);
+    pcl::toROSMsg(*m_rgbd_cloud, rgb);
     m_rgbd_publisher.publish(rgb);
-    pcl::toROSMsg(m_bin_A_cloud, a);
-    pcl::toROSMsg(m_bin_B_cloud, b);
-    pcl::toROSMsg(m_bin_C_cloud, c);
-    pcl::toROSMsg(m_bin_D_cloud, d);
-    pcl::toROSMsg(m_bin_E_cloud, e);
-    pcl::toROSMsg(m_bin_F_cloud, f);
-    pcl::toROSMsg(m_bin_G_cloud, g);
-    pcl::toROSMsg(m_bin_H_cloud, h);
-    pcl::toROSMsg(m_bin_I_cloud, i);
-    pcl::toROSMsg(m_bin_K_cloud, k);
-    pcl::toROSMsg(m_bin_J_cloud, j);
-    pcl::toROSMsg(m_bin_L_cloud, l);
+    pcl::toROSMsg(*m_bin_A_cloud, a);
+    pcl::toROSMsg(*m_bin_B_cloud, b);
+    pcl::toROSMsg(*m_bin_C_cloud, c);
+    pcl::toROSMsg(*m_bin_D_cloud, d);
+    pcl::toROSMsg(*m_bin_E_cloud, e);
+    pcl::toROSMsg(*m_bin_F_cloud, f);
+    pcl::toROSMsg(*m_bin_G_cloud, g);
+    pcl::toROSMsg(*m_bin_H_cloud, h);
+    pcl::toROSMsg(*m_bin_I_cloud, i);
+    pcl::toROSMsg(*m_bin_K_cloud, k);
+    pcl::toROSMsg(*m_bin_J_cloud, j);
+    pcl::toROSMsg(*m_bin_L_cloud, l);
     m_shelf_A_pub.publish(a);
     m_shelf_B_pub.publish(b);
     m_shelf_C_pub.publish(c);
@@ -383,7 +409,6 @@ class CropTool {
     m_shelf_K_pub.publish(k);
     m_shelf_L_pub.publish(l);
   }
-
 
   float m_left_crop, m_right_crop, m_bottom_crop, m_top_crop, m_front_crop,
       m_back_crop;
@@ -402,10 +427,10 @@ class CropTool {
   std::mutex m_mutex;
   sensor_msgs::CameraInfo m_camera_info_msg;
 
-  pcl::PointCloud<pcl::PointXYZRGB> m_bin_A_cloud, m_bin_B_cloud, m_bin_C_cloud,
-      m_bin_D_cloud, m_bin_E_cloud, m_bin_F_cloud, m_bin_G_cloud, m_bin_H_cloud,
-      m_bin_I_cloud, m_bin_J_cloud, m_bin_K_cloud, m_bin_L_cloud, m_rgbd_cloud,
-      m_label_cloud;
+  pcl::PointCloud<pcl::PointXYZRGB>::Ptr m_bin_A_cloud, m_bin_B_cloud,
+      m_bin_C_cloud, m_bin_D_cloud, m_bin_E_cloud, m_bin_F_cloud, m_bin_G_cloud,
+      m_bin_H_cloud, m_bin_I_cloud, m_bin_J_cloud, m_bin_K_cloud, m_bin_L_cloud,
+      m_rgbd_cloud, m_label_cloud;
 
   ros::ServiceServer m_service_server;
 
@@ -417,6 +442,7 @@ class CropTool {
   tf::TransformListener m_tf_listener;
 
   atomic_bool m_crop_requested;
+  bool m_first_received;
 };
 
 }  // end namespace
