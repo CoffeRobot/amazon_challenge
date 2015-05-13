@@ -39,7 +39,11 @@ using namespace std;
 
 namespace amazon_challenge {
 
-enum SEG_TYPE {VALID=0, SIZE, HEIGHT};
+enum SEG_TYPE {
+  VALID = 0,
+  SIZE,
+  HEIGHT
+};
 
 struct SegmentPose {
 
@@ -183,7 +187,8 @@ class CloudSegmenter {
     pcl::PointCloud<pcl::PointXYZ> plane_cloud, filter_cloud;
     vector<pcl::PointCloud<pcl::PointXYZ>> clusters;
     ObjectSegmentation os;
-    os.clusterComponentsEuclidean(m_cloud, clusters);
+    //os.clusterComponentsEuclidean(m_cloud, clusters);
+    os.clusterExpectedComponents(m_bin_items.size(), m_cloud, clusters);
     m_found_clusters = clusters;
     m_cluster_pose.clear();
     m_is_valid_cluster.clear();
@@ -305,12 +310,10 @@ class CloudSegmenter {
       if (m_is_valid_cluster[i] == SEG_TYPE::SIZE) {
         cluster_name << "size" << invalid;
         invalid++;
-      }
-      else if (m_is_valid_cluster[i] == SEG_TYPE::HEIGHT) {
+      } else if (m_is_valid_cluster[i] == SEG_TYPE::HEIGHT) {
         cluster_name << "height" << invalid;
         invalid++;
-      }
-      else {
+      } else {
         if (valid < m_bin_items.size())
           cluster_name << m_bin_items[valid] << "_scan";
         else

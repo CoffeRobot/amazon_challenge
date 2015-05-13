@@ -80,8 +80,8 @@ class PeriodicCloudPublisher {
         m_nh.advertise<sensor_msgs::PointCloud2>("periodic_cloud_shelf", 1);
     m_bin_publisher =
         m_nh.advertise<sensor_msgs::PointCloud2>("periodic_cloud_bin", 1);
-    m_kinect_publisher =
-            m_nh.advertise<sensor_msgs::PointCloud2>("periodic_color_cloud", 1);
+    m_bin_rgbd_publisher =
+            m_nh.advertise<sensor_msgs::PointCloud2>("periodic_cloud_bin_rgbd", 1);
 
     m_client =
         m_nh.serviceClient<laser_assembler::AssembleScans2>("assemble_scans2");
@@ -302,15 +302,11 @@ class PeriodicCloudPublisher {
     tf::StampedTransform transform;
     string target_frame = "base_footprint";
 
-    try {
-      m_tf_listener->lookupTransform(target_frame, dest_frame, ros::Time(0),
-                                     transform);
-      origin = transform.getOrigin();
-      return true;
-    }
-    catch (tf::TransformException& ex) {
-      return false;
-    }
+    if(!getTimedTransform(*m_tf_listener, target_frame, dest_frame, 2.0, transform))
+        return false;
+
+    origin = transform.getOrigin();
+    return true;
   }
 
   void stopTiltScanner() {
@@ -467,46 +463,6 @@ class PeriodicCloudPublisher {
     }
   }
 
-  void labelCloud(pcl::PointCloud<pcl::PointXYZRGB>& cloud) {
-    tf::Vector3 bin_origin;
-    if (getTransformOrigin("shelf_bin_A", bin_origin)) {
-      colorCloudWithBin("bin_A", bin_origin, cloud);
-    }
-    if (getTransformOrigin("shelf_bin_B", bin_origin)) {
-      colorCloudWithBin("bin_B", bin_origin, cloud);
-    }
-    if (getTransformOrigin("shelf_bin_C", bin_origin)) {
-      colorCloudWithBin("bin_C", bin_origin, cloud);
-    }
-    if (getTransformOrigin("shelf_bin_D", bin_origin)) {
-      colorCloudWithBin("bin_D", bin_origin, cloud);
-    }
-    if (getTransformOrigin("shelf_bin_E", bin_origin)) {
-      colorCloudWithBin("bin_E", bin_origin, cloud);
-    }
-    if (getTransformOrigin("shelf_bin_F", bin_origin)) {
-      colorCloudWithBin("bin_F", bin_origin, cloud);
-    }
-    if (getTransformOrigin("shelf_bin_G", bin_origin)) {
-      colorCloudWithBin("bin_G", bin_origin, cloud);
-    }
-    if (getTransformOrigin("shelf_bin_H", bin_origin)) {
-      colorCloudWithBin("bin_H", bin_origin, cloud);
-    }
-    if (getTransformOrigin("shelf_bin_I", bin_origin)) {
-      colorCloudWithBin("bin_I", bin_origin, cloud);
-    }
-    if (getTransformOrigin("shelf_bin_J", bin_origin)) {
-      colorCloudWithBin("bin_A", bin_origin, cloud);
-    }
-    if (getTransformOrigin("shelf_bin_K", bin_origin)) {
-      colorCloudWithBin("bin_A", bin_origin, cloud);
-    }
-    if (getTransformOrigin("shelf_bin_L", bin_origin)) {
-      colorCloudWithBin("bin_L", bin_origin, cloud);
-    }
-  }
-
   void laserCallback(const ros::TimerEvent& e) {
 
     m_laser_start = chrono::system_clock::now();
@@ -656,30 +612,6 @@ class PeriodicCloudPublisher {
     m_mutex.unlock();
   }
 
-  /*void publishShelfMarkers()
-  {
-      string target_frame = "base_footprint";
-      string dest_frame = "shelf_frame";
-      tf::StampedTransform transform;
-      try {
-        m_tf_listener->lookupTransform(target_frame, dest_frame, ros::Time(0),
-                                       transform);
-      }
-      catch (tf::TransformException& ex) {
-        ROS_ERROR("Error in shelf publish of type %s", ex.what());
-        return;
-      }
-      auto origin = transform.getOrigin();
-      visualization_msgs::Marker shelf_marker;
-      getShelfMarker(shelf_marker);
-      shelf_marker.header.frame_id = target_frame;
-      shelf_marker.pose.position.x += origin.x();
-      shelf_marker.pose.position.y += origin.y();
-      shelf_marker.pose.position.z += origin.z();
-
-      m_shelf_marker_pub.publish(shelf_marker);
-  }*/
-
   void publishCurrentBinMarkers() {
 
     string target_frame = "base_footprint";
@@ -752,10 +684,9 @@ class PeriodicCloudPublisher {
     pcl::toROSMsg(*m_bin_cloud_rgb, kinect_msg);
 
     // publish clouds for debugging purposes
-    m_publisher.publish(out_msg);
     m_shelf_publisher.publish(shelf_msg);
     m_bin_publisher.publish(bin_msg);
-    m_kinect_publisher.publish(kinect_msg);
+    m_bin_rgbd_publisher.publish(kinect_msg);
   }
 
   void publishMarkers() { publishCurrentBinMarkers(); }
@@ -828,7 +759,7 @@ class PeriodicCloudPublisher {
     getTimedTransform(*m_tf_listener, target_frame, dest_frame, 2.0f, transform);
     auto origin = transform.getOrigin();
 
-    auto size = getBinSize(m_bin_name);
+    auto size = getBinSize(dest_frame);
 
     float min_x = origin.x() + 0.04;
     float max_x = origin.x() + size.x() - 0.02;
@@ -839,10 +770,15 @@ class PeriodicCloudPublisher {
 
     cropCloud(d_cloud, min_x, max_x, min_y, max_y, min_z, max_z, m_bin_cloud);
     cropCloud(rgb_cloud, min_x, max_x, min_y, max_y, min_z, max_z, m_bin_cloud_rgb);
+
+    stringstream ss;
+    ss << "CROP: d: " << d_cloud->points.size() << " " << m_bin_cloud->points.size()
+       << " rgb: " << rgb_cloud->points.size() << " " << m_bin_cloud_rgb->points.size();
+    ROS_INFO(ss.str().c_str());
   }
 
   // publishers
-  ros::Publisher m_publisher, m_shelf_publisher, m_bin_publisher, m_kinect_publisher;
+  ros::Publisher m_publisher, m_shelf_publisher, m_bin_publisher, m_bin_rgbd_publisher;
   // service clients
   ros::ServiceClient m_client, m_segmentation_client, m_tracking_client,
       m_pr2_laser_client;
@@ -857,15 +793,6 @@ class PeriodicCloudPublisher {
       SyncPolicyRGBD;
   typedef message_filters::Synchronizer<SyncPolicyRGBD> SynchronizerRGBD;
   boost::shared_ptr<SynchronizerRGBD> m_sync_rgbd;
-
-  // message_filters::Subscriber<sensor_msgs::Image> m_rgb_filter;
-  // message_filters::Subscriber<sensor_msgs::CameraInfo> m_camera_info_filter;
-  // message_filters::Subscriber<sensor_msgs::Image> m_depth_filter;
-  // typedef message_filters::sync_policies::ApproximateTime<
-  //    sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo>
-  //    SyncPolicyRGBD;
-  // typedef message_filters::Synchronizer<SyncPolicyRGBD> SynchronizerRGBD;
-  // std::shared_ptr<SynchronizerRGBD> m_kinect_sync;
 
   // timers
   ros::Timer m_timer;
@@ -924,7 +851,7 @@ int main(int argc, char** argv) {
   ros::Rate r(100);
   while (ros::ok()) {
     aggregated_cloud_publisher.publishClouds();
-    aggregated_cloud_publisher.publishMarkers();
+    //aggregated_cloud_publisher.publishMarkers();
     // aggregated_cloud_publisher.publishShelfMarkers();
     // aggregated_cloud_publisher.publishCurrentBinMarkers();
     ros::spinOnce();

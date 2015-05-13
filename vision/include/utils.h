@@ -216,6 +216,7 @@ bool getTimedTransform(const tf::TransformListener& listener,
                        std::string target_frame, std::string dest_frame,
                        float sec, tf::StampedTransform& transform) {
   ros::Time begin = ros::Time::now();
+  ros::Rate rate(100);
   while ((ros::Time::now() - begin).toSec() < sec) {
     try {
       listener.lookupTransform(target_frame, dest_frame, ros::Time(0),
@@ -223,6 +224,7 @@ bool getTimedTransform(const tf::TransformListener& listener,
       return true;
     }
     catch (tf::TransformException& ex) {
+        rate.sleep();
     }
   }
   std::stringstream ss;

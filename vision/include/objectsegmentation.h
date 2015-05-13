@@ -31,6 +31,10 @@ class ObjectSegmentation {
       pcl::PointCloud<pcl::PointXYZ>& in_cloud,
       std::vector<pcl::PointCloud<pcl::PointXYZ>>& clusters);
 
+  void clusterExpectedComponents(
+      int expected_clusters, pcl::PointCloud<pcl::PointXYZ>& in_cloud,
+      std::vector<pcl::PointCloud<pcl::PointXYZ>>& clusters);
+
   void extractPose(const pcl::PointCloud<pcl::PointXYZ>& cloud,
                    Eigen::Vector4f& centroid, Eigen::Quaternionf& rotation,
                    float& w, float& h, float& d);

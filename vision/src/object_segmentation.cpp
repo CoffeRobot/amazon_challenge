@@ -1,4 +1,6 @@
 #include "../include/objectsegmentation.h"
+#include <limits>
+#include <ros/ros.h>
 
 using namespace std;
 
@@ -119,11 +121,61 @@ void ObjectSegmentation::clusterComponentsEuclidean(
   }
 }
 
+void ObjectSegmentation::clusterExpectedComponents(
+    int expected_clusters, pcl::PointCloud<pcl::PointXYZ> &in_cloud,
+    std::vector<pcl::PointCloud<pcl::PointXYZ>> &clusters) {
+  pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(
+      new pcl::search::KdTree<pcl::PointXYZ>);
+  tree->setInputCloud(in_cloud.makeShared());
+
+  std::vector<pcl::PointIndices> cluster_indices;
+  pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
+
+  ec.setMinClusterSize(100);
+  ec.setMaxClusterSize(25000);
+
+  std::vector<float> distances = {0.005, 0.01, 0.015, 0.02, 0.025};
+  int min_num_clusters = numeric_limits<int>::max();
+
+  stringstream ss;
+  for (auto dis : distances) {
+    // 2cm
+    ec.setSearchMethod(tree);
+    ec.setInputCloud(in_cloud.makeShared());
+    ec.extract(cluster_indices);
+    ec.setClusterTolerance(dis);
+
+    if (cluster_indices.size() <= min_num_clusters &&
+        cluster_indices.size() >= expected_clusters) {
+
+      clusters.clear();
+      for (auto it = cluster_indices.begin(); it != cluster_indices.end();
+           ++it) {
+
+        pcl::PointCloud<pcl::PointXYZ> tmp_cloud;
+        tmp_cloud.header = in_cloud.header;
+
+        for (auto pit = it->indices.begin();
+             pit != it->indices.end(); ++pit) {
+
+          auto pt = in_cloud.points[*pit];
+          pcl::PointXYZ p(pt.x, pt.y, pt.z);
+
+          tmp_cloud.push_back(p);
+        }
+
+        clusters.push_back(tmp_cloud);
+      }
+      min_num_clusters = cluster_indices.size();
+    }
+    ss << "SEG: " << dis << " clusters " << cluster_indices.size() << "\n";
+  }
+  ROS_INFO(ss.str().c_str());
+}
+
 void ObjectSegmentation::extractPose(
-    const pcl::PointCloud<pcl::PointXYZ> &cloud,
-    Eigen::Vector4f &centroid, Eigen::Quaternionf &rotation, float &w, float &h,
-    float &d)
-{
+    const pcl::PointCloud<pcl::PointXYZ> &cloud, Eigen::Vector4f &centroid,
+    Eigen::Quaternionf &rotation, float &w, float &h, float &d) {
   pcl::compute3DCentroid(cloud, centroid);
   Eigen::Matrix3f covariance;
   computeCovarianceMatrixNormalized(cloud, centroid, covariance);
