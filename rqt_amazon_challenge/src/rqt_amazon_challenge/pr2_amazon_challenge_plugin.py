@@ -46,6 +46,7 @@ import copy
 import random
 
 from std_srvs.srv import Empty
+from std_msgs.msg import String
 
 from pr2_controllers_msgs.msg import Pr2GripperCommand
 
@@ -155,6 +156,7 @@ class PR2AmazonChallengePlugin(Plugin):
         self._widget.base_col_1_pos_button.clicked[bool].connect(self._handle_base_col_1_pos_button_clicked)
         self._widget.base_col_2_pos_button.clicked[bool].connect(self._handle_base_col_2_pos_button_clicked)
         self._widget.base_col_3_pos_button.clicked[bool].connect(self._handle_base_col_3_pos_button_clicked)
+        self._widget.base_retreat_button.clicked[bool].connect(self._handle_base_retreat_button_clicked)
 
         self._widget.head_start_pos_button.clicked[bool].connect(self._handle_head_row_1_pos_button_clicked)
         self._widget.head_row_1_pos_button.clicked[bool].connect(self._handle_head_row_1_pos_button_clicked)
@@ -170,7 +172,6 @@ class PR2AmazonChallengePlugin(Plugin):
         self._widget.drop_oreo_button.clicked[bool].connect(self._handle_drop_oreo_button_clicked)
 
 
-        self._widget.pc_perception_button.clicked[bool].connect(self._handle_pc_perception_button_clicked)
         self._widget.detector_button.clicked[bool].connect(self._handle_detector_button_clicked)
         self._widget.pregrasp_button.clicked[bool].connect(self._handle_pregrasp_button_clicked)
 
@@ -178,11 +179,29 @@ class PR2AmazonChallengePlugin(Plugin):
 
         self._mode = 'pregrasp'
 
+        self._got_task = False
+        self._timer = rospy.Timer(rospy.Duration(1.0), self.timer_cb)
+        self._task_sub = rospy.Subscriber('/amazon_next_task', String, self.task_cb)
+
     @staticmethod
     def add_arguments(parser):
         group = parser.add_argument_group('Options for rqt_amazon_challenge plugin')
         # group.add_argument('bagfiles', type=argparse.FileType('r'), nargs='*', default=[], help='Bagfiles to load')
 
+
+    def timer_cb(self, event):
+        if self._got_task:
+            self._widget.item_label.setText(self._item)
+            self._widget.bin_label.setText(self._bin)
+
+    def task_cb(self, msg):
+        text = msg.data
+        text = text.replace('[','')
+        text = text.replace(']','')
+        words = text.split(',')
+        self._bin = words[0]
+        self._item = words[1]
+        self._got_task = True
 
     def shutdown_plugin(self):
         # TODO unregister all publishers here
@@ -205,9 +224,6 @@ class PR2AmazonChallengePlugin(Plugin):
 
 
     # mode callback
-    def _handle_pc_perception_button_clicked(self):
-        self._mode = 'point_cloud_perception'
-        rospy.loginfo('[GUI]: point_cloud_perception mode')
 
     def _handle_detector_button_clicked(self):
         self._mode = 'detector'
@@ -545,6 +561,26 @@ class PR2AmazonChallengePlugin(Plugin):
                 continue
 
         base_pos_goal = base_pos_dict['column_3']
+
+        rospy.loginfo('Base setpoint: ')
+        rospy.loginfo(base_pos_goal)
+
+        self._bm.goAngle(base_pos_goal[5])
+        self._bm.goPosition(base_pos_goal[0:2])
+        self._bm.goAngle(base_pos_goal[5])
+
+    def _handle_base_retreat_button_clicked(self):
+        rospy.loginfo('[GUI]: base retreat')
+
+        while not rospy.is_shutdown():
+            try:
+                base_pos_dict = rospy.get_param('/base_pos_dict')
+                break
+            except:
+                rospy.sleep(random.uniform(0,1))
+                continue
+
+        base_pos_goal = [-1.42, self._bm.trans[1], self._bm.trans[2], 0.0, 0.0, 0.0]
 
         rospy.loginfo('Base setpoint: ')
         rospy.loginfo(base_pos_goal)
