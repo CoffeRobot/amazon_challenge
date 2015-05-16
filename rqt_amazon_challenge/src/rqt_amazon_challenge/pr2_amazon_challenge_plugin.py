@@ -89,20 +89,21 @@ class PR2AmazonChallengePlugin(Plugin):
         # Add widget to the user interface
         context.add_widget(self._widget)
 
+
         while not rospy.is_shutdown():
             rospy.loginfo('[GUI]: connecting to moveit...')
             try:
-                self._left_arm = moveit_commander.MoveGroupCommander('left_arm')
-                self._right_arm = moveit_commander.MoveGroupCommander('right_arm')
-                self._arms = moveit_commander.MoveGroupCommander('arms')
-                self._torso = moveit_commander.MoveGroupCommander('torso')
-                self._head = moveit_commander.MoveGroupCommander('head')
+                self._robot = moveit_commander.RobotCommander()
+                self._left_arm = self._robot.get_group('left_arm')
+                self._right_arm = self._robot.get_group('right_arm')
+                self._arms = self._robot.get_group('arms')
+                self._torso = self._robot.get_group('torso')
+                self._head = self._robot.get_group('head')
                 self._arms_dict = {'left_arm': self._left_arm, 'right_arm': self._right_arm}
                 break
             except:
                 rospy.sleep(1.0)
                 pass
-
 
         while not rospy.is_shutdown():
             try:
@@ -115,12 +116,6 @@ class PR2AmazonChallengePlugin(Plugin):
                 continue
 
         # get base_move parameters
-
-        self._bm = baseMove.baseMove(verbose=False)
-        self._bm.setPosTolerance(base_move_params['pos_tolerance'])
-        self._bm.setAngTolerance(base_move_params['ang_tolerance'])
-        self._bm.setLinearGain(base_move_params['linear_gain'])
-        self._bm.setAngularGain(base_move_params['angular_gain'])
 
         self._l_gripper_pub = rospy.Publisher('/l_gripper_controller/command', Pr2GripperCommand)
 
@@ -183,6 +178,31 @@ class PR2AmazonChallengePlugin(Plugin):
         group = parser.add_argument_group('Options for rqt_amazon_challenge plugin')
         # group.add_argument('bagfiles', type=argparse.FileType('r'), nargs='*', default=[], help='Bagfiles to load')
 
+
+
+    def get_bm(self):
+        while not rospy.is_shutdown():
+            try:
+                base_move_params = rospy.get_param('/base_move')
+                break
+            except:
+                rospy.sleep(random.uniform(0,1))
+                continue
+
+        self._bm = baseMove.baseMove(verbose=False)
+        self._bm.setPosTolerance(base_move_params['pos_tolerance'])
+        self._bm.setAngTolerance(base_move_params['ang_tolerance'])
+        self._bm.setLinearGain(base_move_params['linear_gain'])
+        self._bm.setAngularGain(base_move_params['angular_gain'])
+        rospy.sleep(1.0)
+
+
+    def del_bm(self):
+        try:
+            del(self._bm)
+
+        except:
+            pass
 
     def timer_cb(self, event):
         if self._got_task:
@@ -499,6 +519,7 @@ class PR2AmazonChallengePlugin(Plugin):
         self._arms.go()
 
     def _handle_base_col_1_pos_button_clicked(self):
+        self.get_bm()
         # put arms in start position
         self._handle_arms_start_pos_button_clicked()
         rospy.loginfo('[GUI]: base col 1 pos')
@@ -520,7 +541,10 @@ class PR2AmazonChallengePlugin(Plugin):
         self._bm.goPosition(base_pos_goal[0:2])
         self._bm.goAngle(base_pos_goal[5])
 
+        self.del_bm()
+
     def _handle_base_col_2_pos_button_clicked(self):
+        self.get_bm()
         # put arms in start position
         self._handle_arms_start_pos_button_clicked()
         rospy.loginfo('[GUI]: base col 2 pos')
@@ -542,7 +566,10 @@ class PR2AmazonChallengePlugin(Plugin):
         self._bm.goPosition(base_pos_goal[0:2])
         self._bm.goAngle(base_pos_goal[5])
 
+        self.del_bm()
+
     def _handle_base_col_3_pos_button_clicked(self):
+        self.get_bm()
         # put arms in start position
         self._handle_arms_start_pos_button_clicked()
         rospy.loginfo('[GUI]: base col 3 pos')
@@ -564,7 +591,10 @@ class PR2AmazonChallengePlugin(Plugin):
         self._bm.goPosition(base_pos_goal[0:2])
         self._bm.goAngle(base_pos_goal[5])
 
+        self.del_bm()
+
     def _handle_base_retreat_button_clicked(self):
+        self.get_bm()
         rospy.loginfo('[GUI]: base retreat')
 
         while not rospy.is_shutdown():
@@ -583,6 +613,7 @@ class PR2AmazonChallengePlugin(Plugin):
         self._bm.goAngle(base_pos_goal[5])
         self._bm.goPosition(base_pos_goal[0:2])
         self._bm.goAngle(base_pos_goal[5])
+        self.del_bm()
 
     def _handle_head_row_1_pos_button_clicked(self):
         rospy.loginfo('[GUI]: head row 1 pos')
