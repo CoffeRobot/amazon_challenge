@@ -261,6 +261,8 @@ class PeriodicCloudPublisher {
     vision::ReceiveCloud srv;
     srv.request.cloud = cloud;
     srv.request.rgb_cloud = kinect;
+    srv.request.rgb_img = *m_last_rgb_msg;
+    srv.request.rgb_info = m_camera_info_msg;
     srv.request.stop_publish = false;
 
     // Make the service call

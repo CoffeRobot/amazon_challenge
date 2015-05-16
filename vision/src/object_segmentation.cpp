@@ -134,12 +134,13 @@ void ObjectSegmentation::clusterExpectedComponents(
   ec.setMinClusterSize(100);
   ec.setMaxClusterSize(25000);
 
-  std::vector<float> distances = {0.005, 0.01, 0.015, 0.02, 0.025};
+  std::vector<float> distances = {0.002, 0.005, 0.01, 0.015, 0.02};
   int min_num_clusters = numeric_limits<int>::max();
 
   stringstream ss;
   for (auto dis : distances) {
     // 2cm
+    cluster_indices.clear();
     ec.setSearchMethod(tree);
     ec.setInputCloud(in_cloud.makeShared());
     ec.extract(cluster_indices);

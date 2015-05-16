@@ -130,6 +130,7 @@ add_dependencies(
 add_executable(object_segmentation_node
     src/object_segmentation_node.cpp
     src/object_segmentation.cpp
+    src/objectrecognition.cpp
 )
 
 target_link_libraries(object_segmentation_node

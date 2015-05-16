@@ -26,14 +26,20 @@
 #include <pcl/kdtree/kdtree.h>
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/segmentation/sac_segmentation.h>
+#include <image_geometry/pinhole_camera_model.h>
 #include <random>
 #include <pcl/common/pca.h>
 #include <eigen3/Eigen/Core>
 #include <eigen3/Eigen/Geometry>
 #include <pcl/common/common.h>
 #include <atomic>
-#include <../include/objectsegmentation.h>
-#include <../include/utils.h>
+#include <opencv2/core/core.hpp>
+#include <cv_bridge/cv_bridge.h>
+#include <sensor_msgs/CameraInfo.h>
+#include <sensor_msgs/image_encodings.h>
+#include "../include/objectsegmentation.h"
+#include "../include/utils.h"
+#include "../include/objectrecognition.h"
 
 using namespace std;
 
@@ -62,13 +68,15 @@ struct SegmentPose {
 class CloudSegmenter {
 
  public:
-  CloudSegmenter() : m_nh() {
+  CloudSegmenter() : m_nh(), m_object_recognition() {
     m_service_server = m_nh.advertiseService(
         "receive_point_cloud", &CloudSegmenter::receivePointCloud, this);
     m_segmentation_pub =
         m_nh.advertise<sensor_msgs::PointCloud2>("segmentation_cloud", 1);
     m_marker_pub =
         m_nh.advertise<visualization_msgs::Marker>("cluster_markers", 1);
+    m_image_pub = m_nh.advertise<sensor_msgs::Image>("seg_box_projection", 1);
+
     m_task_subscriber = m_nh.subscribe("/amazon_next_task", 10,
                                        &CloudSegmenter::nextTaskCallback, this);
     m_bin_item_subscriber = m_nh.subscribe(
@@ -91,6 +99,23 @@ class CloudSegmenter {
       m_mutex.lock();
       m_cloud.clear();
       pcl::fromROSMsg(req.cloud, m_cloud);
+      m_camera_info = req.rgb_info;
+      sensor_msgs::Image img = req.rgb_img;
+
+      sensor_msgs::ImageConstPtr img_ptr =
+          boost::make_shared<sensor_msgs::Image>(req.rgb_img);
+
+      cv_bridge::CvImageConstPtr cv_ptr;
+      try {
+        cv_ptr =
+            cv_bridge::toCvShare(img_ptr, sensor_msgs::image_encodings::BGR8);
+      }
+      catch (cv_bridge::Exception &e) {
+        ROS_ERROR("cv_bridge exception: %s", e.what());
+        return false;
+      }
+      m_rgb_image = cv_ptr->image;
+
       ss << m_cloud.points.size();
       ROS_INFO(ss.str().c_str());
 
@@ -126,9 +151,10 @@ class CloudSegmenter {
     bool num_items_done = false;
 
     string s = msg->data;
-    string separator = ",";
+    string separator = ",]";
+    s[s.length() - 1] = separator[0];
 
-    for (auto i = 1; i < msg->data.length() - 1; i++) {
+    for (auto i = 1; i < msg->data.length(); i++) {
       char c = s[i];
       if (c != separator[0] && !num_items_done)
         num_items_s += c;
@@ -138,11 +164,17 @@ class CloudSegmenter {
         item += c;
       else if (c == separator[0] && num_items_done) {
         items.push_back(item);
+        // ROS_INFO(item.c_str());
+        item = "";
+      } else if (c == separator[1] && num_items_done) {
+        items.push_back(item);
+        // ROS_INFO(item.c_str());
         item = "";
       }
     }
 
-    items.push_back(item);
+    // ROS_INFO(item.c_str());
+    // items.push_back(item);
 
     m_bin_items = items;
   }
@@ -187,7 +219,7 @@ class CloudSegmenter {
     pcl::PointCloud<pcl::PointXYZ> plane_cloud, filter_cloud;
     vector<pcl::PointCloud<pcl::PointXYZ>> clusters;
     ObjectSegmentation os;
-    //os.clusterComponentsEuclidean(m_cloud, clusters);
+    // os.clusterComponentsEuclidean(m_cloud, clusters);
     os.clusterExpectedComponents(m_bin_items.size(), m_cloud, clusters);
     m_found_clusters = clusters;
     m_cluster_pose.clear();
@@ -219,7 +251,7 @@ class CloudSegmenter {
     }
     ss << " valid " << count;
 
-    filterClustersbySize();
+    // filterClustersbySize();
 
     count = 0;
     for (auto b : m_is_valid_cluster) {
@@ -262,6 +294,8 @@ class CloudSegmenter {
     }
 
     m_cloud_colour = cluster_cloud;
+
+    projectBoundingBoxToImage();
 
     ROS_INFO(ss.str().c_str());
 
@@ -340,6 +374,14 @@ class CloudSegmenter {
       pcl::toROSMsg(m_cloud_colour, cloud);
       m_segmentation_pub.publish(cloud);
     }
+  }
+
+  void publishImage() {
+    if (m_box_image.empty()) return;
+
+    sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8",
+                                                   m_box_image).toImageMsg();
+    m_image_pub.publish(msg);
   }
 
   bool needToPublish() { return m_is_publishing; }
@@ -457,8 +499,130 @@ class CloudSegmenter {
     return marker;
   }
 
+  void projectBoundingBoxToImage() {
+
+    m_rgb_image.copyTo(m_box_image);
+    std::vector<cv::Rect> cluster_bbox;
+
+    for (auto i = 0; i < m_is_valid_cluster.size(); ++i) {
+      stringstream cluster_name;
+
+
+
+      if (m_is_valid_cluster[i] != SEG_TYPE::VALID) continue;
+
+      pcl::PointCloud<pcl::PointXYZ> &cloud = m_found_clusters[i];
+      pcl::PointXYZ min_pt, max_pt;
+      pcl::getMinMax3D(cloud, min_pt, max_pt);
+      float cx = max_pt.x - min_pt.x;
+      float cy = max_pt.y - min_pt.y;
+      float cz = max_pt.z - min_pt.z;
+
+      SegmentPose &pose = m_cluster_pose[i];
+      tf::Vector3 &centroid = m_cluster_pose[i].centroid;
+      tf::Quaternion &rotation = m_cluster_pose[i].rotation;
+
+      float min_x = centroid.x() - pose.width / 2.0;
+      float min_y = centroid.y() - pose.height / 2.0;
+      float min_z = centroid.z() - pose.depth / 2.0;
+      float max_x = centroid.x() + pose.width / 2.0;
+      float max_y = centroid.y() + pose.height / 2.0;
+      float max_z = centroid.z() + pose.depth / 2.0;
+
+      pcl::PointCloud<pcl::PointXYZ> tmp_cloud, transformed;
+      tmp_cloud.header.frame_id = "base_footprint";
+
+      tmp_cloud.points.push_back(pcl::PointXYZ(min_x, min_y, min_z));
+      tmp_cloud.points.push_back(pcl::PointXYZ(min_x, min_y, max_z));
+      tmp_cloud.points.push_back(pcl::PointXYZ(min_x, max_y, max_z));
+      tmp_cloud.points.push_back(pcl::PointXYZ(min_x, max_y, min_z));
+      tmp_cloud.points.push_back(pcl::PointXYZ(max_x, min_y, min_z));
+      tmp_cloud.points.push_back(pcl::PointXYZ(max_x, min_y, max_z));
+      tmp_cloud.points.push_back(pcl::PointXYZ(max_x, max_y, max_z));
+      tmp_cloud.points.push_back(pcl::PointXYZ(max_x, max_y, min_z));
+
+      pcl_ros::transformPointCloud("head_mount_kinect_rgb_optical_frame",
+                                   tmp_cloud, transformed, m_tf_listener);
+
+      image_geometry::PinholeCameraModel model;
+      model.fromCameraInfo(m_camera_info);
+
+      //ss << "camera " << model.fx() << " " << model.fy() << "\n";
+
+      float min_u = numeric_limits<float>::max();
+      float min_v = numeric_limits<float>::max();
+      float max_u = 0;
+      float max_v = 0;
+
+      double unit_scaling = DepthTraits<float>::fromMeters(float(1));
+
+      for (auto pt : transformed.points) {
+
+        float u = ((pt.x * model.fx()) / pt.z) + model.cx();
+        float v = ((pt.y * model.fy()) / pt.z) + model.cy();
+
+        if (u > max_u) max_u = u;
+        if (u < min_u) min_u = u;
+        if (v > max_v) max_v = v;
+        if (v < min_v) min_v = v;
+
+        //ss << pt.x << " " << pt.y << " " << pt.z << " " << u << " " << v
+        //   << "\n";
+      }
+
+      //ss << "Rect:" << min_u << " " << max_u << " " << min_v << " " << max_v;
+
+
+      cv::Rect r(cv::Point2d(min_u, min_v), cv::Point2d(max_u, max_v));
+
+      cv::rectangle(m_box_image, r, cv::Scalar(0, 255, 0), 2);
+
+      cluster_bbox.push_back(r);
+    }
+
+    vector<vector<float>> probs;
+    m_object_recognition.classifyClusters(m_rgb_image, m_bin_items,
+                                          cluster_bbox, probs);
+
+    stringstream ss;
+
+    for(auto i = 0; i < m_bin_items.size(); ++i)
+    {
+        ss  << "\n" << m_bin_items[i] << ": ";
+
+        float max_prob = 0;
+        cv::Point2d p;
+        string obj_name;
+        int obj_id;
+        for(auto j = 0; j < probs[i].size(); ++j)
+        {
+            auto val = probs[i][j];
+            if(val > max_prob)
+            {
+               cv:: Rect r = cluster_bbox[j];
+               p = r.tl();
+               obj_name = m_bin_items[j];
+               max_prob = val;
+               obj_id = j;
+            }
+
+
+            ss << probs[i][j] << " ";
+
+        }
+
+        stringstream objss;
+        objss << obj_id << "->" << max_prob;
+        cv::putText( m_box_image, objss.str(), p, cv::FONT_HERSHEY_SIMPLEX, 0.4,
+                  cv::Scalar(0, 255, 0), 1, 3 );
+        ss << "\n";
+    }
+
+    //ROS_INFO(ss.str().c_str());
+  }
+
   ros::NodeHandle m_nh;
-  ros::Publisher m_segmentation_pub, m_marker_pub;
+  ros::Publisher m_segmentation_pub, m_marker_pub, m_image_pub;
   ros::ServiceServer m_service_server;
   tf::TransformListener m_tf_listener;
   tf::TransformBroadcaster m_tf_broadcaster;
@@ -475,11 +639,15 @@ class CloudSegmenter {
   atomic_bool m_segmentation_request;
   atomic_bool m_segmentation_ready;
 
+  cv::Mat m_rgb_image, m_box_image;
+  sensor_msgs::CameraInfo m_camera_info;
+
   string m_bin_name;
   string m_obj_name;
   vector<string> m_bin_items;
-
   atomic_bool m_is_publishing;
+
+  ObjectRecognition m_object_recognition;
 };
 }
 int main(int argc, char **argv) {
@@ -487,12 +655,14 @@ int main(int argc, char **argv) {
   ros::init(argc, argv, "object_segmentation_node");
 
   amazon_challenge::CloudSegmenter cs;
+  // amazon_challenge::ObjectRecognition recog;
 
   ros::Rate r(100);
   while (ros::ok()) {
     if (cs.needToPublish()) {
       cs.publishTFPose();
       cs.publishClusters();
+      cs.publishImage();
     }
     ros::spinOnce();
     r.sleep();
