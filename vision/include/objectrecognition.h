@@ -19,22 +19,29 @@ class ObjectRecognition {
                         const std::vector<cv::Rect> clusters,
                         std::vector<std::vector<float>>& probs);
 
+
  private:
   void extractHistogram(const cv::Mat& src, const cv::Mat& mask,
                         std::vector<cv::Mat>& hists);
 
-  void extractHSHistograms(const cv::Mat& src, const cv::Mat& mask,
-  std::vector<cv::Mat>& hists);
+  void extractHistogram(const cv::Mat &src, const cv::Mat &mask, cv::Mat &hist);
 
-  void loadData();
+  void extractHSHistograms(const cv::Mat& src, const cv::Mat& mask, bool cv_normalized,
+                           cv::Mat &hist);
 
   float histogramInterserction(const std::vector<cv::Mat>& fst,
                                const std::vector<cv::Mat>& scd);
 
-  void project_histograms(const cv::Mat &in, cv::Mat& out);
+  void project_histograms(const cv::Mat &in, const cv::Mat& hist, cv::Mat &out);
 
-  std::map<std::string, std::vector<cv::Mat>> m_rgb_models;
-  std::map<std::string, std::vector<cv::Mat>> m_hs_models;
+  void compareHistograms(const cv::Mat& fst, const cv::Mat& scd);
+
+  void loadData();
+
+  void testObject(cv::Rect box, cv::Mat& img);
+
+  std::map<std::string, cv::Mat> m_rgb_models;
+  std::map<std::string, cv::Mat> m_hs_models;
 
 };
 

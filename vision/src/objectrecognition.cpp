@@ -80,96 +80,189 @@ void ObjectRecognition::extractHistogram(const Mat &src, const Mat &mask,
   }
 }
 
-void ObjectRecognition::extractHSHistograms(const Mat &src, const Mat &mask,
-                                            std::vector<Mat> &hists)
-{
-    float h_range[] = { 0, 179 };
-    const float *hRange = {h_range};
-    float s_range[] = { 0, 255 };
-    const float *sRange = {s_range};
-    int h_bins = 30; int s_bins = 32;
+void ObjectRecognition::extractHistogram(const Mat &src, const Mat &mask,
+                                         cv::Mat &hist) {
 
-    Mat hsv;
-    cvtColor( src, hsv, COLOR_BGR2HSV );
-    vector<Mat> hsv_planes;
-    split(hsv, hsv_planes);
+  /// Establish the number of bins
+  int bins = 30;
+  int histSize[] = {bins, bins, bins};
 
-    bool uniform = true;
-    bool accumulate = false;
+  /// Set the ranges ( for B,G,R) )
+  float range[] = {0, 256};
+  const float *histRange[] = {range, range, range};
 
-    /// Compute the histograms:
-    calcHist(&hsv_planes[0], 1, 0, mask, hists[0], 1, &h_bins, &hRange,
-             uniform, accumulate);
-    calcHist(&hsv_planes[1], 1, 0, mask, hists[1], 1, &s_bins, &sRange,
-             uniform, accumulate);
+  bool uniform = true;
+  bool accumulate = false;
+  int channels[] = {0, 1, 2};
 
-    float num_pixels;
-    if (!mask.empty())
-      num_pixels = cv::countNonZero(mask);
-    else
-      num_pixels = src.cols * src.rows;
-
-    for (auto i = 0; i < h_bins; ++i) {
-      hists[0].at<float>(0, i) = hists[0].at<float>(0, i) / num_pixels;
-    }
-
-    for (auto i = 0; i < s_bins; ++i) {
-      hists[1].at<float>(0, i) = hists[1].at<float>(0, i) / num_pixels;
-    }
-
+  calcHist(&src, 1, channels, mask, hist, 2, histSize, histRange, true, false);
+  normalize(hist, hist, 0, 1, NORM_MINMAX, -1, Mat());
 }
 
+void ObjectRecognition::extractHSHistograms(const Mat &src, const Mat &mask,
+                                            bool cv_normalized, Mat &hist) {
+
+  Mat hsv;
+  cvtColor(src, hsv, COLOR_BGR2HSV);
+
+  float num_pixels;
+  if (!mask.empty()) {
+    num_pixels = cv::countNonZero(mask);
+    // std::cout << "pixels " << num_pixels << std::endl;
+  } else
+    num_pixels = src.cols * src.rows;
+
+  float h_range[] = {0, 179};
+  float s_range[] = {0, 255};
+
+  const float *hRange = {h_range};
+  const float *sRange = {s_range};
+
+  int h_bins = 50;
+  int s_bins = 52;
+  int histSize[] = {h_bins, s_bins};
+
+  // hue varies from 0 to 179, saturation from 0 to 255
+  float h_ranges[] = {0, 180};
+  float s_ranges[] = {0, 256};
+
+  const float *ranges[] = {h_ranges, s_ranges};
+  // Use the o-th and 1-st channels
+  int channels[] = {0, 1};
+
+  bool uniform = true;
+  bool accumulate = false;
+
+  /// Calculate the histograms for the HSV images
+  calcHist(&hsv, 1, channels, mask, hist, 2, histSize, ranges, true, false);
+
+  if (cv_normalized)
+    normalize(hist, hist, 0, 1, NORM_MINMAX, -1, Mat());
+  else {
+    for (auto i = 0; i < hist.rows; ++i) {
+      for (auto j = 0; j < hist.cols; ++j) {
+        hist.at<float>(i, j) = hist.at<float>(i, j) / num_pixels;
+      }
+    }
+  }
+}
+
+void ObjectRecognition::compareHistograms(const Mat &fst, const Mat &scd) {
+  float corr = compareHist(fst, scd, CV_COMP_CORREL);
+  float chi = compareHist(fst, scd, CV_COMP_CHISQR);
+  float inter = compareHist(fst, scd, CV_COMP_INTERSECT);
+  float bha = compareHist(fst, scd, CV_COMP_BHATTACHARYYA);
+
+  std::cout << "corr " << corr << " chi " << chi << " inter " << inter
+            << " bha " << bha << std::endl;
+}
 
 void ObjectRecognition::loadData() {
   Mat rgb = imread(
-      "/home/amazon/amazon_challenge_ws/src/amazon_challenge/data/"
+      "/home/alessandro/amazon_challenge_ws/src/amazon_challenge/data/"
       "histogram_models/kyjen_squeakin_eggs_plush_puppies.png");
+  Mat rgb_mask = imread(
+      "/home/alessandro/amazon_challenge_ws/src/amazon_challenge/data/"
+      "histogram_models/kyjen_squeakin_eggs_plush_puppies_mask.png",
+      0);
 
-  vector<Mat> histogram(3, Mat());
-  extractHistogram(rgb, Mat(), histogram);
-  m_rgb_models.insert(pair<string, vector<Mat>>(
-      "kyjen_squeakin_eggs_plush_puppies", histogram));
-  vector<Mat> hsv_0(2, Mat());
-  extractHSHistograms(rgb, Mat(), hsv_0);
-  m_hs_models.insert(pair<string, vector<Mat>>(
-                         "kyjen_squeakin_eggs_plush_puppies", hsv_0));
+  Mat hsv_0, rgb_0;
+  extractHSHistograms(rgb, Mat(), false, hsv_0);
+  extractHistogram(rgb, Mat(), rgb_0);
+
+  m_hs_models.insert(
+      pair<string, Mat>("kyjen_squeakin_eggs_plush_puppies", hsv_0));
+  m_rgb_models.insert(
+      pair<string, Mat>("kyjen_squeakin_eggs_plush_puppies", rgb_0));
 
   rgb = imread(
-      "/home/amazon/amazon_challenge_ws/src/amazon_challenge/data/"
+      "/home/alessandro/amazon_challenge_ws/src/amazon_challenge/data/"
       "histogram_models/first_years_take_and_toss_straw_cup.png");
-  vector<Mat> histogram2(3, Mat());
+  rgb_mask = imread(
+      "/home/alessandro/amazon_challenge_ws/src/amazon_challenge/data/"
+      "histogram_models/first_years_take_and_toss_straw_cup.png",
+      0);
+  /*vector<Mat> histogram2(3, Mat());
   extractHistogram(rgb, Mat(), histogram2);
   m_rgb_models.insert(pair<string, vector<Mat>>(
-      "first_years_take_and_toss_straw_cup", histogram2));
-  vector<Mat> hsv_1(2, Mat());
-  extractHSHistograms(rgb, Mat(), hsv_1);
-  m_hs_models.insert(pair<string, vector<Mat>>(
-                         "first_years_take_and_toss_straw_cup", hsv_1));
+      "first_years_take_and_toss_straw_cup", histogram2));*/
+  Mat hsv_1, rgb_1, hsv_mask_1, rgb_mask_1;
+  extractHSHistograms(rgb, Mat(), true, hsv_1);
+  extractHistogram(rgb, Mat(), rgb_1);
 
-  stringstream ss;
-  ss << "DIFFERENCE: " << histogramInterserction(histogram, histogram2);
-  ROS_INFO(ss.str().c_str());
-  /*
-  ofstream file(
-      "/home/amazon/amazon_challenge_ws/src/amazon_challenge/data/hist.txt",
-      std::ofstream::out);
-  stringstream ss;
+  m_hs_models.insert(
+      pair<string, Mat>("first_years_take_and_toss_straw_cup", hsv_1));
+  m_rgb_models.insert(
+      pair<string, Mat>("first_years_take_and_toss_straw_cup", rgb_1));
 
-  for (auto i = 0; i < histogram.size(); ++i) {
-    Mat &fst_c = histogram[i];
-    for (auto j = 0; j < fst_c.rows; ++j) {
-      ss << fst_c.at<float>(0, j) << ",";
-    }
+  Mat test = imread(
+      "/home/alessandro/amazon_challenge_ws/src/amazon_challenge/data/"
+      "histogram_models/test.jpg");
 
-    ss << "\n";
-  }
+  Rect balls(284, 223, 66, 68);
+  Rect cups(334, 202, 62, 100);
+  Rect oreo(401, 220, 93, 72);
+  Rect box(335, 73, 40, 100);
+  Rect glue(450, 93, 44, 92);
 
-  float val = histogramInterserction(histogram, histogram);
+  std::cout << "balls \n";
+  testObject(balls, test);
 
-  ss << "intersection " << val;
+  std::cout << "cups \n";
+  testObject(cups, test);
 
-  file << ss.str();
-  file.close();*/
+  std::cout << "oreo \n";
+  testObject(oreo, test);
+
+  std::cout << "box \n";
+  testObject(box, test);
+
+  std::cout << "glue \n";
+  testObject(glue, test);
+
+  // calcBackProject( &hsv, 1, channels, hist, backproj, ranges, 1, true );
+}
+
+void ObjectRecognition::testObject(Rect box, Mat &img) {
+  Mat1b mask(img.rows, img.cols, uchar(0));
+  rectangle(mask, box, 255, -1);
+  Mat croppedImage = img(box);
+  Mat hs_hist, rgb_hist;
+  extractHSHistograms(croppedImage, Mat(), true, hs_hist);
+  extractHistogram(croppedImage, Mat(), rgb_hist);
+
+  auto rgb_model_0 = m_rgb_models.find("kyjen_squeakin_eggs_plush_puppies");
+  auto hs_model_0 = m_hs_models.find("kyjen_squeakin_eggs_plush_puppies");
+
+  auto rgb_model_1 = m_rgb_models.find("first_years_take_and_toss_straw_cup");
+  auto hs_model_1 = m_hs_models.find("first_years_take_and_toss_straw_cup");
+
+  std::cout << "HSV \n";
+  compareHistograms(hs_hist, hs_model_0->second);
+  compareHistograms(hs_hist, hs_model_1->second);
+  std::cout << "RGB \n";
+  compareHistograms(rgb_hist, rgb_model_0->second);
+  compareHistograms(rgb_hist, rgb_model_1->second);
+
+  float h_range[] = {0, 179};
+  float s_range[] = {0, 255};
+  const float *ranges[] = {h_range, s_range};
+  int channels[] = {0, 1};
+
+
+  Mat m0_bp, m1_bp;
+
+  Mat hist0, hist1;
+  normalize( hs_model_0->second, hist0, 0, 255, NORM_MINMAX, -1, Mat() );
+  normalize( hs_model_1->second, hist1, 0, 255, NORM_MINMAX, -1, Mat() );
+
+  calcBackProject(&croppedImage, 1, channels, hist0 , m0_bp, ranges, 1, true);
+  calcBackProject(&croppedImage, 1, channels, hist1, m1_bp, ranges, 1, true);
+
+  /// Draw the backproj
+  imshow("BackProj0", m0_bp);
+  imshow("BackProj1", m1_bp);
+  waitKey(0);
 }
 
 float ObjectRecognition::histogramInterserction(const std::vector<Mat> &fst,
@@ -187,16 +280,16 @@ float ObjectRecognition::histogramInterserction(const std::vector<Mat> &fst,
   return result / 3.0f;
 }
 
-void ObjectRecognition::project_histograms(const Mat&in, Mat &out)
-{
-    cv::Mat hsv;
-    cvtColor( in, hsv, COLOR_BGR2HSV );
+void ObjectRecognition::project_histograms(const Mat &in, const Mat &hist,
+                                           Mat &out) {
+  cv::Mat hsv;
+  cvtColor(in, hsv, COLOR_BGR2HSV);
 
-    auto model = m_hs_models.find("first_years_take_and_toss_straw_cup");
-    float h_range[] = { 0, 179 };
-     const float* ranges = { h_range };
+  auto model = m_hs_models.find("first_years_take_and_toss_straw_cup");
+  float h_range[] = {0, 179};
+  const float *ranges = {h_range};
 
-    calcBackProject( &hsv, 1, 0, MatND(model->second[0]), out, &ranges, 1, true );
+  calcBackProject(&hsv, 1, 0, hist, out, &ranges, 1, true);
 }
 
 }  // end namespace
