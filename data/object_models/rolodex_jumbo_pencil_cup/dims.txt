@@ -1,0 +1,2 @@
+width x height x depth (in cm)
+4.5 x 4.5 x 0.1
