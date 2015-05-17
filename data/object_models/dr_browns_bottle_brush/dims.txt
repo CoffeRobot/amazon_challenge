@@ -1,0 +1,2 @@
+width x height x depth (in cm)
+11 x 31 x 5

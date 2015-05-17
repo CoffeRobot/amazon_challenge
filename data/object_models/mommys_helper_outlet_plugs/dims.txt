@@ -1,0 +1,2 @@
+width x height x depth (in cm)
+9.2 x 19 x 5.5
