@@ -194,6 +194,7 @@ class CloudSegmenter {
       auto res = srv.response.message;
       stringstream ss;
       ss << "num items: " <<res.size() << "\n";
+      m_bin_items = res;
       for(auto s : res)
           ss << s << "\n";
 
@@ -207,8 +208,10 @@ class CloudSegmenter {
     pcl::PointCloud<pcl::PointXYZ> plane_cloud, filter_cloud;
     vector<pcl::PointCloud<pcl::PointXYZ>> clusters;
     ObjectSegmentation os;
-    // os.clusterComponentsEuclidean(m_cloud, clusters);
     os.clusterExpectedComponents(m_bin_items.size(), m_cloud, clusters);
+    stringstream ss1;
+    ss1 << "SEG_0: num clusters found: " << clusters.size();
+    ROS_INFO(ss1.str().c_str());
     m_found_clusters = clusters;
     m_cluster_pose.clear();
     m_is_valid_cluster.clear();

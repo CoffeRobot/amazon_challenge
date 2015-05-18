@@ -140,6 +140,7 @@ void ObjectSegmentation::clusterExpectedComponents(
   stringstream ss;
   for (auto dis : distances) {
     // 2cm
+    cluster_indices.clear();
     ec.setSearchMethod(tree);
     ec.setInputCloud(in_cloud.makeShared());
     ec.extract(cluster_indices);
@@ -167,8 +168,9 @@ void ObjectSegmentation::clusterExpectedComponents(
         clusters.push_back(tmp_cloud);
       }
       min_num_clusters = cluster_indices.size();
+      std::cout << "printing" << std::endl;
     }
-    ss << "SEG: " << dis << " clusters " << cluster_indices.size() << "\n";
+    ss << "SEG: " << dis << " clusters " << clusters.size() << "\n";
   }
   ROS_INFO(ss.str().c_str());
 }
