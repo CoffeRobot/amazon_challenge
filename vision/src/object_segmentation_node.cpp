@@ -34,6 +34,7 @@
 #include <atomic>
 #include <../include/objectsegmentation.h>
 #include <../include/utils.h>
+#include <amazon_challenge_bt_actions/BinTrigger.h>
 
 using namespace std;
 
@@ -73,6 +74,11 @@ class CloudSegmenter {
                                        &CloudSegmenter::nextTaskCallback, this);
     m_bin_item_subscriber = m_nh.subscribe(
         "/amazon_bin_items", 10, &CloudSegmenter::binItemsCallback, this);
+
+    m_task_manager_service =
+        m_nh.serviceClient<amazon_challenge_bt_actions::BinTrigger>(
+            "bin_trigger");
+
     m_segmentation_request = false;
     m_is_publishing = false;
   };
@@ -182,12 +188,26 @@ class CloudSegmenter {
 
     if (m_cloud.points.size() == 0) return;
 
+    amazon_challenge_bt_actions::BinTrigger srv;
+
+    if (m_task_manager_service.call(srv)) {
+      auto res = srv.response.message;
+      stringstream ss;
+      ss << "num items: " <<res.size() << "\n";
+      for(auto s : res)
+          ss << s << "\n";
+
+      ROS_INFO(ss.str().c_str());
+    } else {
+      ROS_ERROR("Task manager node not listening");
+    }
+
     m_found_clusters.clear();
 
     pcl::PointCloud<pcl::PointXYZ> plane_cloud, filter_cloud;
     vector<pcl::PointCloud<pcl::PointXYZ>> clusters;
     ObjectSegmentation os;
-    //os.clusterComponentsEuclidean(m_cloud, clusters);
+    // os.clusterComponentsEuclidean(m_cloud, clusters);
     os.clusterExpectedComponents(m_bin_items.size(), m_cloud, clusters);
     m_found_clusters = clusters;
     m_cluster_pose.clear();
@@ -465,6 +485,7 @@ class CloudSegmenter {
   visualization_msgs::Marker m_shelf_marker;
   ros::Subscriber m_task_subscriber;
   ros::Subscriber m_bin_item_subscriber;
+  ros::ServiceClient m_task_manager_service;
 
   std::mutex m_mutex;
   pcl::PointCloud<pcl::PointXYZ> m_cloud, m_filtered_cloud, m_plane_cloud;
