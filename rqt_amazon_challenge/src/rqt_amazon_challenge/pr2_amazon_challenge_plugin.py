@@ -157,6 +157,8 @@ class PR2AmazonChallengePlugin(Plugin):
         self._got_task = False
         self._timer = rospy.Timer(rospy.Duration(1.0), self.timer_cb)
         self._task_sub = rospy.Subscriber('/amazon_next_task', String, self.task_cb)
+        self.get_moveit()
+        self.get_bm()
 
     @staticmethod
     def add_arguments(parser):
@@ -180,20 +182,6 @@ class PR2AmazonChallengePlugin(Plugin):
                 rospy.sleep(random.uniform(0, 1))
                 pass
 
-    def del_moveit(self):
-
-        try:
-            del(self._arms_dict)
-            del(self._left_arm)
-            del(self._right_arm)
-            del(self._arms)
-            del(self._torso)
-            del(self._head)
-            del(self._robot)
-
-        except:
-            pass
-
     def get_bm(self):
         while not rospy.is_shutdown():
             try:
@@ -210,13 +198,6 @@ class PR2AmazonChallengePlugin(Plugin):
         self._bm.setAngularGain(base_move_params['angular_gain'])
         rospy.sleep(2.0)
 
-
-    def del_bm(self):
-        try:
-            del(self._bm)
-
-        except:
-            pass
 
     def timer_cb(self, event):
         if self._got_task:
@@ -267,7 +248,6 @@ class PR2AmazonChallengePlugin(Plugin):
     # left arm
 
     def _handle_l_arm_start_pos_button_clicked(self):
-        self.get_moveit()
         rospy.loginfo('[GUI]: left arm start pos')
 
         while not rospy.is_shutdown():
@@ -282,10 +262,8 @@ class PR2AmazonChallengePlugin(Plugin):
 
         self._left_arm.set_joint_value_target(joint_pos_goal)
         self._left_arm.go()
-        self.del_moveit()
 
     def _handle_l_arm_row_1_pos_button_clicked(self):
-        self.get_moveit()
         rospy.loginfo('[GUI]: left arm row 1 pos')
 
         while not rospy.is_shutdown():
@@ -300,10 +278,8 @@ class PR2AmazonChallengePlugin(Plugin):
 
         self._left_arm.set_joint_value_target(joint_pos_goal)
         self._left_arm.go()
-        self.del_moveit()
 
     def _handle_l_arm_row_2_pos_button_clicked(self):
-        self.get_moveit()
         rospy.loginfo('[GUI]: left arm row 2 pos')
 
         while not rospy.is_shutdown():
@@ -318,10 +294,8 @@ class PR2AmazonChallengePlugin(Plugin):
 
         self._left_arm.set_joint_value_target(joint_pos_goal)
         self._left_arm.go()
-        self.del_moveit()
 
     def _handle_l_arm_row_3_pos_button_clicked(self):
-        self.get_moveit()
         rospy.loginfo('[GUI]: left arm row 3 pos')
 
 
@@ -337,10 +311,8 @@ class PR2AmazonChallengePlugin(Plugin):
 
         self._left_arm.set_joint_value_target(joint_pos_goal)
         self._left_arm.go()
-        self.del_moveit()
 
     def _handle_l_arm_row_4_pos_button_clicked(self):
-        self.get_moveit()
         rospy.loginfo('[GUI]: left arm row 4 pos')
         while not rospy.is_shutdown():
             try:
@@ -354,13 +326,11 @@ class PR2AmazonChallengePlugin(Plugin):
 
         self._left_arm.set_joint_value_target(joint_pos_goal)
         self._left_arm.go()
-        self.del_moveit()
 
 
     # right arm
 
     def _handle_r_arm_start_pos_button_clicked(self):
-        self.get_moveit()
         rospy.loginfo('[GUI]: right arm start pos')
 
         while not rospy.is_shutdown():
@@ -375,10 +345,8 @@ class PR2AmazonChallengePlugin(Plugin):
 
         self._right_arm.set_joint_value_target(joint_pos_goal)
         self._right_arm.go()
-        self.del_moveit()
 
     def _handle_r_arm_row_1_pos_button_clicked(self):
-        self.get_moveit()
         rospy.loginfo('[GUI]: right arm row 1 pos')
 
         while not rospy.is_shutdown():
@@ -393,10 +361,8 @@ class PR2AmazonChallengePlugin(Plugin):
 
         self._right_arm.set_joint_value_target(joint_pos_goal)
         self._right_arm.go()
-        self.del_moveit()
 
     def _handle_r_arm_row_2_pos_button_clicked(self):
-        self.get_moveit()
         rospy.loginfo('[GUI]: right arm row 2 pos')
 
         while not rospy.is_shutdown():
@@ -411,10 +377,8 @@ class PR2AmazonChallengePlugin(Plugin):
 
         self._right_arm.set_joint_value_target(joint_pos_goal)
         self._right_arm.go()
-        self.del_moveit()
 
     def _handle_r_arm_row_3_pos_button_clicked(self):
-        self.get_moveit()
         rospy.loginfo('[GUI]: right arm row 3 pos')
 
         while not rospy.is_shutdown():
@@ -429,10 +393,8 @@ class PR2AmazonChallengePlugin(Plugin):
 
         self._right_arm.set_joint_value_target(joint_pos_goal)
         self._right_arm.go()
-        self.del_moveit()
 
     def _handle_r_arm_row_4_pos_button_clicked(self):
-        self.get_moveit()
         rospy.loginfo('[GUI]: right arm row 4 pos')
 
         while not rospy.is_shutdown():
@@ -447,12 +409,10 @@ class PR2AmazonChallengePlugin(Plugin):
 
         self._right_arm.set_joint_value_target(joint_pos_goal)
         self._right_arm.go()
-        self.del_moveit()
 
     # torso
 
     def _handle_torso_start_pos_button_clicked(self):
-        self.get_moveit()
         rospy.loginfo('[GUI]: torso start pos')
 
         while not rospy.is_shutdown():
@@ -467,10 +427,8 @@ class PR2AmazonChallengePlugin(Plugin):
 
         self._torso.set_joint_value_target(joint_pos_goal)
         self._torso.go()
-        self.del_moveit()
 
     def _handle_torso_row_1_pos_button_clicked(self):
-        self.get_moveit()
         rospy.loginfo('[GUI]: torso row 1 pos')
 
         while not rospy.is_shutdown():
@@ -485,10 +443,8 @@ class PR2AmazonChallengePlugin(Plugin):
 
         self._torso.set_joint_value_target(joint_pos_goal)
         self._torso.go()
-        self.del_moveit()
 
     def _handle_torso_row_2_pos_button_clicked(self):
-        self.get_moveit()
         rospy.loginfo('[GUI]: torso row 2 pos')
 
         while not rospy.is_shutdown():
@@ -503,10 +459,8 @@ class PR2AmazonChallengePlugin(Plugin):
 
         self._torso.set_joint_value_target(joint_pos_goal)
         self._torso.go()
-        self.del_moveit()
 
     def _handle_torso_row_3_pos_button_clicked(self):
-        self.get_moveit()
         rospy.loginfo('[GUI]: torso row 3 pos')
 
         while not rospy.is_shutdown():
@@ -521,11 +475,9 @@ class PR2AmazonChallengePlugin(Plugin):
 
         self._torso.set_joint_value_target(joint_pos_goal)
         self._torso.go()
-        self.del_moveit()
 
 
     def _handle_torso_row_4_pos_button_clicked(self):
-        self.get_moveit()
         rospy.loginfo('[GUI]: torso row 4 pos')
 
         while not rospy.is_shutdown():
@@ -540,10 +492,8 @@ class PR2AmazonChallengePlugin(Plugin):
 
         self._torso.set_joint_value_target(joint_pos_goal)
         self._torso.go()
-        self.del_moveit()
 
     def _handle_arms_start_pos_button_clicked(self):
-        self.get_moveit()
         rospy.loginfo('[GUI]: arms start pos')
 
         while not rospy.is_shutdown():
@@ -561,11 +511,8 @@ class PR2AmazonChallengePlugin(Plugin):
 
         self._arms.set_joint_value_target(joint_pos_goal)
         self._arms.go()
-        self.del_moveit()
 
     def _handle_base_col_1_pos_button_clicked(self):
-        self.get_moveit()
-        self.get_bm()
         # put arms in start position
         self._handle_arms_start_pos_button_clicked()
         rospy.loginfo('[GUI]: base col 1 pos')
@@ -587,12 +534,8 @@ class PR2AmazonChallengePlugin(Plugin):
         self._bm.goPosition(base_pos_goal[0:2])
         self._bm.goAngle(base_pos_goal[5])
 
-        self.del_bm()
-        self.del_moveit()
 
     def _handle_base_col_2_pos_button_clicked(self):
-        self.get_moveit()
-        self.get_bm()
         # put arms in start position
         self._handle_arms_start_pos_button_clicked()
         rospy.loginfo('[GUI]: base col 2 pos')
@@ -614,12 +557,8 @@ class PR2AmazonChallengePlugin(Plugin):
         self._bm.goPosition(base_pos_goal[0:2])
         self._bm.goAngle(base_pos_goal[5])
 
-        self.del_bm()
-        self.del_moveit()
 
     def _handle_base_col_3_pos_button_clicked(self):
-        self.get_moveit()
-        self.get_bm()
         # put arms in start position
         self._handle_arms_start_pos_button_clicked()
         rospy.loginfo('[GUI]: base col 3 pos')
@@ -641,11 +580,8 @@ class PR2AmazonChallengePlugin(Plugin):
         self._bm.goPosition(base_pos_goal[0:2])
         self._bm.goAngle(base_pos_goal[5])
 
-        self.del_bm()
-        self.del_moveit()
 
     def _handle_base_retreat_button_clicked(self):
-        self.get_bm()
         rospy.loginfo('[GUI]: base retreat')
 
         base_pos_goal = [-1.42, self._bm.trans[1], self._bm.trans[2], 0.0, 0.0, 0.0]
@@ -656,10 +592,8 @@ class PR2AmazonChallengePlugin(Plugin):
         self._bm.goAngle(base_pos_goal[5])
         self._bm.goPosition(base_pos_goal[0:2])
         self._bm.goAngle(base_pos_goal[5])
-        self.del_bm()
 
     def _handle_head_row_1_pos_button_clicked(self):
-        self.get_moveit()
         rospy.loginfo('[GUI]: head row 1 pos')
 
         while not rospy.is_shutdown():
@@ -674,10 +608,8 @@ class PR2AmazonChallengePlugin(Plugin):
 
         self._head.set_joint_value_target(head_pos_goal)
         self._head.go()
-        self.del_moveit()
 
     def _handle_head_row_2_pos_button_clicked(self):
-        self.get_moveit()
         rospy.loginfo('[GUI]: head row 2 pos')
 
         while not rospy.is_shutdown():
@@ -692,10 +624,8 @@ class PR2AmazonChallengePlugin(Plugin):
 
         self._head.set_joint_value_target(head_pos_goal)
         self._head.go()
-        self.del_moveit()
 
     def _handle_head_row_3_pos_button_clicked(self):
-        self.get_moveit()
         rospy.loginfo('[GUI]: head row 3 pos')
 
         while not rospy.is_shutdown():
@@ -710,10 +640,8 @@ class PR2AmazonChallengePlugin(Plugin):
 
         self._head.set_joint_value_target(head_pos_goal)
         self._head.go()
-        self.del_moveit()
 
     def _handle_head_row_4_pos_button_clicked(self):
-        self.get_moveit()
         rospy.loginfo('[GUI]: head row 4 pos')
 
         while not rospy.is_shutdown():
@@ -728,7 +656,6 @@ class PR2AmazonChallengePlugin(Plugin):
 
         self._head.set_joint_value_target(head_pos_goal)
         self._head.go()
-        self.del_moveit()
 
     def _handle_start_bt_button_clicked(self):
         rospy.loginfo('[GUI]: start bt button clicked')
