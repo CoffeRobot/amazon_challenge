@@ -137,6 +137,7 @@ void ObjectSegmentation::clusterExpectedComponents(
   std::vector<float> distances = {0.005, 0.01, 0.015, 0.02, 0.025};
   int min_num_clusters = numeric_limits<int>::max();
 
+
   stringstream ss;
   for (auto dis : distances) {
     // 2cm
@@ -168,7 +169,6 @@ void ObjectSegmentation::clusterExpectedComponents(
         clusters.push_back(tmp_cloud);
       }
       min_num_clusters = cluster_indices.size();
-      std::cout << "printing" << std::endl;
     }
     ss << "SEG: " << dis << " clusters " << clusters.size() << "\n";
   }

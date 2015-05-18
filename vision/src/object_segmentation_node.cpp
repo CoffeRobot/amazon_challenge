@@ -208,6 +208,7 @@ class CloudSegmenter {
     pcl::PointCloud<pcl::PointXYZ> plane_cloud, filter_cloud;
     vector<pcl::PointCloud<pcl::PointXYZ>> clusters;
     ObjectSegmentation os;
+    // os.clusterComponentsEuclidean(m_cloud, clusters);
     os.clusterExpectedComponents(m_bin_items.size(), m_cloud, clusters);
     stringstream ss1;
     ss1 << "SEG_0: num clusters found: " << clusters.size();
