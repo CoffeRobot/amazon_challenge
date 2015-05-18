@@ -1,0 +1,2 @@
+width x height x depth (in cm)
+17.5 x 15 x 4.5
