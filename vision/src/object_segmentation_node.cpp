@@ -209,6 +209,9 @@ class CloudSegmenter {
     ObjectSegmentation os;
     // os.clusterComponentsEuclidean(m_cloud, clusters);
     os.clusterExpectedComponents(m_bin_items.size(), m_cloud, clusters);
+    stringstream ss1;
+    ss1 << "SEG0: num clusters found: " << clusters.size();
+    ROS_INFO(ss1.str().c_str());
     m_found_clusters = clusters;
     m_cluster_pose.clear();
     m_is_valid_cluster.clear();
