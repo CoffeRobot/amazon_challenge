@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>812</width>
-    <height>728</height>
+    <width>766</width>
+    <height>952</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -253,7 +253,7 @@
      <rect>
       <x>30</x>
       <y>450</y>
-      <width>281</width>
+      <width>231</width>
       <height>81</height>
      </rect>
     </property>
@@ -493,7 +493,7 @@
      <rect>
       <x>30</x>
       <y>570</y>
-      <width>281</width>
+      <width>231</width>
       <height>81</height>
      </rect>
     </property>
@@ -504,10 +504,10 @@
    <widget class="QFrame" name="frame_3">
     <property name="geometry">
      <rect>
-      <x>340</x>
-      <y>520</y>
-      <width>421</width>
-      <height>141</height>
+      <x>20</x>
+      <y>670</y>
+      <width>711</width>
+      <height>181</height>
      </rect>
     </property>
     <property name="frameShape">
@@ -586,9 +586,17 @@
       <rect>
        <x>70</x>
        <y>80</y>
-       <width>311</width>
-       <height>17</height>
+       <width>631</width>
+       <height>51</height>
       </rect>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>8</pointsize>
+       <weight>75</weight>
+       <italic>true</italic>
+       <bold>true</bold>
+      </font>
      </property>
      <property name="text">
       <string>JSON: </string>
@@ -598,7 +606,7 @@
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>110</y>
+       <y>150</y>
        <width>66</width>
        <height>17</height>
       </rect>
@@ -611,8 +619,8 @@
      <property name="geometry">
       <rect>
        <x>80</x>
-       <y>110</y>
-       <width>281</width>
+       <y>150</y>
+       <width>601</width>
        <height>17</height>
       </rect>
      </property>
@@ -621,6 +629,38 @@
      </property>
     </widget>
    </widget>
+   <zorder>l_arm_start_pos_button</zorder>
+   <zorder>label</zorder>
+   <zorder>label_2</zorder>
+   <zorder>label_3</zorder>
+   <zorder>l_arm_row_1_pos_button</zorder>
+   <zorder>l_arm_row_2_pos_button</zorder>
+   <zorder>l_arm_row_3_pos_button</zorder>
+   <zorder>l_arm_row_4_pos_button</zorder>
+   <zorder>r_arm_row_3_pos_button</zorder>
+   <zorder>r_arm_row_4_pos_button</zorder>
+   <zorder>r_arm_start_pos_button</zorder>
+   <zorder>r_arm_row_1_pos_button</zorder>
+   <zorder>r_arm_row_2_pos_button</zorder>
+   <zorder>torso_row_3_pos_button</zorder>
+   <zorder>torso_row_4_pos_button</zorder>
+   <zorder>torso_start_pos_button</zorder>
+   <zorder>torso_row_1_pos_button</zorder>
+   <zorder>torso_row_2_pos_button</zorder>
+   <zorder>base_calibration_button</zorder>
+   <zorder>frame</zorder>
+   <zorder>label_5</zorder>
+   <zorder>arms_start_pos_button</zorder>
+   <zorder>label_6</zorder>
+   <zorder>groupBox</zorder>
+   <zorder>head_row_2_pos_button</zorder>
+   <zorder>head_row_1_pos_button</zorder>
+   <zorder>head_row_3_pos_button</zorder>
+   <zorder>head_row_4_pos_button</zorder>
+   <zorder>head_start_pos_button</zorder>
+   <zorder>start_bt_button</zorder>
+   <zorder>frame_3</zorder>
+   <zorder>json_file_label</zorder>
   </widget>
   <widget class="QToolBar" name="mainToolBar">
    <attribute name="toolBarArea">
@@ -636,7 +676,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>812</width>
+     <width>766</width>
      <height>25</height>
     </rect>
    </property>
