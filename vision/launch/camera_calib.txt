@@ -1,0 +1,366 @@
+torso_lift_link -> l_gripper_tool_frame
+position: 
+  x: 0.0816733512973
+  y: 0.964263921673
+  z: 0.346801226839
+orientation: 
+  x: 0.930089503093
+  y: -0.0380251681938
+  z: 0.342746393244
+  w: 0.126540557685
+logitech_camera -> ros_groovy_measureable
+position: 
+  x: 0.203027098709
+  y: 0.0315487252116
+  z: 0.605801959704
+orientation: 
+  x: -0.396283653159
+  y: 0.907810327144
+  z: 0.0724786968495
+  w: -0.116561205697
+saved so far
+1
+torso_lift_link -> l_gripper_tool_frame
+position: 
+  x: 0.164248113038
+  y: 0.768378664209
+  z: 0.262329236724
+orientation: 
+  x: 0.69541674442
+  y: -0.168927898874
+  z: 0.646666404091
+  w: 0.263972495504
+logitech_camera -> ros_groovy_measureable
+position: 
+  x: 0.0839424214641
+  y: 0.0330993114441
+  z: 0.41860080484
+orientation: 
+  x: -0.0351016190045
+  y: 0.997366633195
+  z: -0.0128238077067
+  w: 0.062154849268
+saved so far
+2
+torso_lift_link -> l_gripper_tool_frame
+position: 
+  x: 0.28462038202
+  y: 0.769057864636
+  z: 0.216217484561
+orientation: 
+  x: 0.513451868016
+  y: -0.0697286893409
+  z: 0.81706119649
+  w: 0.252816317321
+logitech_camera -> ros_groovy_measureable
+position: 
+  x: 0.051308515954
+  y: 0.0375151274101
+  z: 0.491583951044
+orientation: 
+  x: 0.233150494585
+  y: 0.97241902599
+  z: 0.00376875319616
+  w: 0.00528027154098
+saved so far
+3
+torso_lift_link -> l_gripper_tool_frame
+position: 
+  x: 0.293122941271
+  y: 0.837049253776
+  z: 0.217482558608
+orientation: 
+  x: 0.175019307017
+  y: 0.066381178642
+  z: 0.942107671913
+  w: 0.278199417356
+logitech_camera -> ros_groovy_measureable
+position: 
+  x: 0.194688065644
+  y: 0.0244902667139
+  z: 0.574619747812
+orientation: 
+  x: 0.584131628227
+  y: 0.809643187955
+  z: 0.0565062588012
+  w: -0.0086713216398
+saved so far
+4
+torso_lift_link -> l_gripper_tool_frame
+position: 
+  x: 0.517801715719
+  y: 0.728924260342
+  z: 0.190804369536
+orientation: 
+  x: 0.339109823065
+  y: -0.131490007645
+  z: 0.881539546344
+  w: 0.301003212642
+logitech_camera -> ros_groovy_measureable
+position: 
+  x: -0.112461210573
+  y: 0.0194095796813
+  z: 0.542032705956
+orientation: 
+  x: 0.395122124366
+  y: 0.908676498256
+  z: -0.0556469739984
+  w: 0.12283705727
+saved so far
+5
+torso_lift_link -> l_gripper_tool_frame
+position: 
+  x: 0.00156266510362
+  y: 0.960972006958
+  z: 0.21074167369
+orientation: 
+  x: 0.763205188182
+  y: -0.0605031354852
+  z: 0.642848203679
+  w: -0.0245641681128
+logitech_camera -> ros_groovy_measureable
+position: 
+  x: 0.308838412745
+  y: -0.0153491225981
+  z: 0.563238411126
+orientation: 
+  x: -0.0910604139317
+  y: 0.963395945341
+  z: -0.123251978617
+  w: -0.219966368525
+saved so far
+6
+torso_lift_link -> l_gripper_tool_frame
+position: 
+  x: 0.0526861231131
+  y: 0.973862551468
+  z: 0.277855663492
+orientation: 
+  x: 0.74200533899
+  y: -0.0932854288392
+  z: 0.660996364653
+  w: 0.0617228611778
+logitech_camera -> ros_groovy_measureable
+position: 
+  x: 0.274043975132
+  y: 0.0627387243007
+  z: 0.573747185517
+orientation: 
+  x: -0.0610674295804
+  y: 0.983956121572
+  z: -0.0946975610458
+  w: -0.138323865611
+saved so far
+7
+torso_lift_link -> l_gripper_tool_frame
+position: 
+  x: 0.241102132786
+  y: 0.931526602886
+  z: 0.285753917232
+orientation: 
+  x: 0.682906886843
+  y: -0.13906424398
+  z: 0.712163862526
+  w: 0.0843916634617
+logitech_camera -> ros_groovy_measureable
+position: 
+  x: 0.102037691184
+  y: 0.0906348135562
+  z: 0.595971098065
+orientation: 
+  x: 0.010236985848
+  y: 0.98832964481
+  z: -0.128146639046
+  w: -0.0817199866102
+saved so far
+8
+torso_lift_link -> l_gripper_tool_frame
+position: 
+  x: 0.407330994783
+  y: 0.944506115036
+  z: 0.306487663494
+orientation: 
+  x: 0.718364948675
+  y: -0.0596624073698
+  z: 0.64366910436
+  w: 0.257064742341
+logitech_camera -> ros_groovy_measureable
+position: 
+  x: -0.0462706531971
+  y: 0.123021210709
+  z: 0.708608707552
+orientation: 
+  x: -0.0255075486199
+  y: 0.996687834577
+  z: 0.0731369022577
+  w: -0.0247733505473
+saved so far
+9
+torso_lift_link -> l_gripper_tool_frame
+position: 
+  x: 0.557683007609
+  y: 0.822467888211
+  z: 0.301374135014
+orientation: 
+  x: 0.545865806349
+  y: -0.344211729589
+  z: 0.579379170057
+  w: 0.497864021573
+logitech_camera -> ros_groovy_measureable
+position: 
+  x: -0.19389051335
+  y: 0.122832346031
+  z: 0.594478693649
+orientation: 
+  x: 0.0178139462819
+  y: 0.92720022988
+  z: 0.0088722241446
+  w: 0.374037004408
+saved so far
+10
+torso_lift_link -> l_gripper_tool_frame
+position: 
+  x: 0.58181123733
+  y: 0.883532771564
+  z: 0.228658388404
+orientation: 
+  x: 0.682895062516
+  y: -0.0928709669805
+  z: 0.595525600692
+  w: 0.412769398096
+logitech_camera -> ros_groovy_measureable
+position: 
+  x: -0.228218754792
+  y: 0.0531900812143
+  z: 0.734868178016
+orientation: 
+  x: -0.0250536852326
+  y: 0.981273358631
+  z: 0.156302874454
+  w: 0.109746616959
+saved so far
+11
+torso_lift_link -> l_gripper_tool_frame
+position: 
+  x: 0.440368768314
+  y: 1.04811048235
+  z: 0.245918997184
+orientation: 
+  x: 0.883700101295
+  y: 0.230329216971
+  z: 0.335006705601
+  w: 0.231933374016
+logitech_camera -> ros_groovy_measureable
+position: 
+  x: -0.0431007913575
+  y: -0.0246079449793
+  z: 0.912559810405
+orientation: 
+  x: -0.297145329219
+  y: 0.862691170954
+  z: 0.333701640817
+  w: -0.236879319057
+saved so far
+12
+torso_lift_link -> l_gripper_tool_frame
+position: 
+  x: 0.268448254592
+  y: 0.827197545288
+  z: 0.215351382572
+orientation: 
+  x: 0.650373967322
+  y: -0.331631051551
+  z: 0.679956044224
+  w: -0.0685151530666
+logitech_camera -> ros_groovy_measureable
+position: 
+  x: 0.0137743677696
+  y: -0.0379876400471
+  z: 0.466006683228
+orientation: 
+  x: -0.0492696265784
+  y: 0.924934781002
+  z: -0.373774504419
+  w: -0.0485878033657
+saved so far
+13
+torso_lift_link -> l_gripper_tool_frame
+position: 
+  x: 0.219529252905
+  y: 0.907438152296
+  z: 0.274171730953
+orientation: 
+  x: 0.973537187956
+  y: 0.0626656243521
+  z: -0.219685723947
+  w: -0.00604531927586
+logitech_camera -> ros_groovy_measureable
+position: 
+  x: 0.152188414231
+  y: -0.188087273349
+  z: 0.641969448477
+orientation: 
+  x: 0.808388883927
+  y: -0.510838380436
+  z: -0.186481445871
+  w: 0.225335819972
+saved so far
+14
+torso_lift_link -> l_gripper_tool_frame
+position: 
+  x: 0.395673656432
+  y: 0.893764493018
+  z: 0.175575207345
+orientation: 
+  x: 0.94002321676
+  y: -0.207122975572
+  z: 0.246795471035
+  w: 0.112019732275
+logitech_camera -> ros_groovy_measureable
+position: 
+  x: -0.112242082843
+  y: -0.158653189071
+  z: 0.656364168426
+orientation: 
+  x: -0.503871577138
+  y: 0.862810118215
+  z: -0.0353487674744
+  w: -0.0205571957473
+saved so far
+15
+
+current position
+[    0.126191,  0.00936311,    -1.21054]
+
+current position
+[  -0.0590544,    0.241083,    0.688486]
+
+current position
+[    0.141348,    0.301351,    0.417885]
+
+current position
+[    0.145884,    0.301514,     0.40985]
+
+current position
+[    0.145895,    0.301511,     0.40981]
+
+current position
+[    0.145895,    0.301511,     0.40981]
+
+residue_mod
+[0.37506004687045325, 0.018725313848950709, 0.018256887697283588, 0.018259235977592717, 0.018259235969751215, 0.018259235969732283]
+
+residue_max
+[0.12359725267397692, 0.0073228679195282143, 0.0066418738437502636, 0.0066485886434122163, 0.0066485544068660444, 0.0066485542312433102]
+
+ee_T_m
+[[           1,           0,           0;
+            0,           1,           0;
+            0,           0,           1]
+[    0.121878,     0.00922,    0.101878]]
+
+w_T_c
+[[   -0.890819,   0.0768463,    0.447811;
+     0.454268,    0.131092,    0.881167;
+   0.00901011,    0.988387,   -0.151688]
+[    0.145895,    0.301511,     0.40981]]
