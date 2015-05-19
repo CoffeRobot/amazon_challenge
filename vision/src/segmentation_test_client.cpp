@@ -73,7 +73,7 @@ class CropTool {
     m_cloud_publisher =
         m_nh.advertise<sensor_msgs::PointCloud2>("segmentation_test_cloud", 1);
     m_shelf_pub =
-            m_nh.advertise<sensor_msgs::PointCloud2>("shelf_test_cloud", 1);
+        m_nh.advertise<sensor_msgs::PointCloud2>("shelf_test_cloud", 1);
   };
 
   void rgbdCallback(const sensor_msgs::ImageConstPtr& depth_msg,
@@ -131,7 +131,8 @@ class CropTool {
     }
   }
 
-  void cropCloudBin(string bin_name, const pcl::PointCloud<pcl::PointXYZRGB>::Ptr& in,
+  void cropCloudBin(string bin_name,
+                    const pcl::PointCloud<pcl::PointXYZRGB>::Ptr& in,
                     pcl::PointCloud<pcl::PointXYZRGB>::Ptr& out) {
     tf::StampedTransform transform;
     if (!getTimedTransform(m_tf_listener, "base_footprint", bin_name, 2.0f,
@@ -153,7 +154,8 @@ class CropTool {
     cropCloud(in, min_x, max_x, min_y, max_y, min_z, max_z, out);
   }
 
-  void cropCloudBin(string bin_name, const pcl::PointCloud<pcl::PointXYZ>::Ptr& in,
+  void cropCloudBin(string bin_name,
+                    const pcl::PointCloud<pcl::PointXYZ>::Ptr& in,
                     pcl::PointCloud<pcl::PointXYZ>::Ptr& out) {
     tf::StampedTransform transform;
     if (!getTimedTransform(m_tf_listener, "base_footprint", bin_name, 2.0f,
@@ -175,28 +177,24 @@ class CropTool {
     cropCloud(in, min_x, max_x, min_y, max_y, min_z, max_z, out);
   }
 
-
-  void debugBin(string bin_name, pcl::PointCloud<pcl::PointXYZRGB>& out)
-  {
-      auto cloud_ptr = m_colored_cloud.makeShared();
-      pcl::PointCloud<pcl::PointXYZRGB>::Ptr cropped(new pcl::PointCloud<pcl::PointXYZRGB>);
-      cropCloudBin(bin_name, cloud_ptr, cropped);
-      Eigen::Vector3i color = getBinColor(bin_name);
-      for(auto i = 0; i < cropped->points.size(); ++i)
-      {
-          pcl::PointXYZRGB& pt = cropped->points[i];
-          pt.r = color.x();
-          pt.g = color.y();
-          pt.b = color.z();
-      }
-      out += *cropped;
+  void debugBin(string bin_name, pcl::PointCloud<pcl::PointXYZRGB>& out) {
+    auto cloud_ptr = m_colored_cloud.makeShared();
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cropped(
+        new pcl::PointCloud<pcl::PointXYZRGB>);
+    cropCloudBin(bin_name, cloud_ptr, cropped);
+    Eigen::Vector3i color = getBinColor(bin_name);
+    for (auto i = 0; i < cropped->points.size(); ++i) {
+      pcl::PointXYZRGB& pt = cropped->points[i];
+      pt.r = color.x();
+      pt.g = color.y();
+      pt.b = color.z();
+    }
+    out += *cropped;
   }
 
-  void debugCropping()
-  {
+  void debugCropping() {
     m_d_crop_cloud.points.clear();
     debugBin("shelf_bin_A", m_d_crop_cloud);
-
   }
 
   void publishCloud() {
@@ -228,19 +226,26 @@ class CropTool {
 
 }  // end namespace
 
+std::vector< std::vector<int> > array_to_matrix(int* m, int rows, int cols) {
+  int i,j;
+  std::vector< std::vector<int> > r;
+  r.resize(rows, std::vector<int>(cols, 0));
+
+  for(i=0;i<rows;i++)
+  {
+    for(j=0;j<cols;j++)
+      r[i][j] = m[i*cols+j];
+  }
+  return r;
+}
+
+
 int main(int argc, char** argv) {
 
-  ros::init(argc, argv, "segmentation_test_client");
 
-  amazon_challenge::CropTool tc;
 
-  ros::Rate r(100);
-  while (ros::ok()) {
 
-    tc.publishCloud();
-    ros::spinOnce();
-    r.sleep();
-  }
+
 
   return 0;
 }
