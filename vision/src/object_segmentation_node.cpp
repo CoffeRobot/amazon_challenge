@@ -225,6 +225,7 @@ class CloudSegmenter {
       if (status[i] == SEG_TYPE::VALID && labels[i].compare("") == 0 &&
           valid_count < labels_left.size()) {
         labels[i] = labels_left[valid_count];
+        valid_count++;
       }
     }
   }
@@ -309,6 +310,14 @@ class CloudSegmenter {
     }
 
     assingLabels(cluster_status, bin_items, name, labels);
+
+    stringstream label_str;
+    label_str << "LABELS:";
+    for(auto l : labels)
+        label_str << l << "\n";
+    ROS_INFO(label_str.str().c_str());
+
+
 
     pcl::PointCloud<pcl::PointXYZRGB> cluster_cloud;
     // pcl::copyPointCloud(m_cloud, m_cloud_colour);
@@ -577,7 +586,7 @@ int main(int argc, char **argv) {
 
   amazon_challenge::CloudSegmenter cs;
 
-  ros::Rate r(100);
+  ros::Rate r(5);
   while (ros::ok()) {
     if (cs.needToPublish()) {
       cs.publishTFPose();

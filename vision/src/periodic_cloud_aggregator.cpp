@@ -92,22 +92,21 @@ class PeriodicCloudPublisher {
     m_rgb_it.reset(new image_transport::ImageTransport(m_nh));
     m_sub_rgb_info.subscribe(m_nh, "/head_mount_kinect/rgb/camera_info", 1);
     /** kinect node settings */
-
-    /*m_sub_depth.subscribe(
+    m_sub_depth.subscribe(
         *m_depth_it,
         "/head_mount_kinect/depth_registered/sw_registered/image_rect_raw", 1,
         image_transport::TransportHints("compressedDepth"));
     m_rgb_it.reset(new image_transport::ImageTransport(m_nh));
     m_sub_rgb.subscribe(*m_rgb_it, "/head_mount_kinect/rgb/image_rect_color", 1,
-                        image_transport::TransportHints("compressed"));*/
+                        image_transport::TransportHints("compressed"));
     /** simulator node settings */
-    m_sub_depth.subscribe(
+    /*m_sub_depth.subscribe(
         *m_depth_it,
         "/head_mount_kinect/depth/image_rect_raw", 1,
         image_transport::TransportHints("raw"));
     m_sub_rgb.subscribe(*m_rgb_it, "/head_mount_kinect/rgb/image_raw", 1,
                         image_transport::TransportHints("raw"));
-
+    */
 
 
 
@@ -301,7 +300,7 @@ class PeriodicCloudPublisher {
     positions.push_back(start);
     positions.push_back(stop);
     //= {(d_top / d_top_h), (d_bottom / d_bottom_h)};
-    auto durations = {ros::Duration(0), ros::Duration(10)};
+    auto durations = {ros::Duration(0), ros::Duration(20)};
 
     stringstream ss;
     ss << "TRAJ: " << positions[0] << " " << positions[1];
@@ -444,9 +443,13 @@ class PeriodicCloudPublisher {
       pcl::fromROSMsg(msg, laser_cloud);
 
       buildPointCloudMessage();
-
+      stringstream ss1;
+      ss1 << "Laser cloud built with points: ";
       m_aggregated_cloud = laser_cloud;
-      //m_aggregated_cloud += m_kinect_cloud;
+      ss1 << laser_cloud.points.size();
+      m_aggregated_cloud += m_kinect_cloud;
+      ss1 << " kinec_cloud: " << m_kinect_cloud.points.size() << " T: "
+          << m_aggregated_cloud.points.size() << " in " << elapsed << " secs";
 
       createCloudBin(m_aggregated_cloud.makeShared(),
                      m_kinect_color_cloud.makeShared());
@@ -455,10 +458,6 @@ class PeriodicCloudPublisher {
       m_aggregated_cloud_ready = true;
 
       elapsed = (ros::Time::now() - m_laser_request_start).toSec();
-
-      stringstream ss1;
-      ss1 << "Aggregated cloud built with points: "
-          << m_aggregated_cloud.points.size() << " in " << elapsed << " secs";
       ROS_INFO(ss1.str().c_str());
 
     } else {
@@ -700,11 +699,11 @@ class PeriodicCloudPublisher {
     auto size = getBinSize(dest_frame);
 
     float min_x = origin.x() + 0.04;
-    float max_x = origin.x() + size.x() - 0.02;
+    float max_x = origin.x() + size.x() - 0.04;
     float min_y = origin.y() + 0.02;
     float max_y = origin.y() + size.y() - 0.035;
     float min_z = origin.z() + 0.01;
-    float max_z = origin.z() + size.z() - 0.04f;
+    float max_z = origin.z() + size.z() - 0.05f;
 
     cropCloud(d_cloud, min_x, max_x, min_y, max_y, min_z, max_z, m_bin_cloud);
     cropCloud(rgb_cloud, min_x, max_x, min_y, max_y, min_z, max_z,
