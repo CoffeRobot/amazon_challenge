@@ -3,18 +3,18 @@ simtrack/detector/device_id: 1
 
 simtrack/scene/include_shelf: false
 
-simtrack/optical_flow/n_scales: 0 # 0=auto
+simtrack/optical_flow/n_scales: 6 # 0=auto
 simtrack/optical_flow/median_filter: true
 simtrack/optical_flow/consistent: true
-simtrack/optical_flow/cons_thres: 0.5
+simtrack/optical_flow/cons_thres: 1
 simtrack/optical_flow/four_orientations: false
 
 simtrack/detector/vec_size: 4
 simtrack/detector/num_iter_ransac: 1000
 
 simtrack/tracker/color_only_mode: false
-simtrack/tracker/n_icp_outer_it: 3
-simtrack/tracker/n_icp_inner_it: 3
+simtrack/tracker/n_icp_outer_it: 5
+simtrack/tracker/n_icp_inner_it: 5
 simtrack/tracker/w_flow: 1.0
 simtrack/tracker/w_ar_flow: 1.0
 simtrack/tracker/w_disp: 1.0 # ignored in color_only_mode

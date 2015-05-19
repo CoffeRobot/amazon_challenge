@@ -1,0 +1,17 @@
+<launch>
+  <include file="$(find vision)/launch/camera_logitech.launch"/>
+
+  <rosparam command="load" file="$(find vision)/config/parameters.yaml"/>
+  <param name="simtrack/use_compressed_streams" value="false" />
+  <param name="simtrack/tracker/color_only_mode" value="true" />
+
+  <param name="simtrack/model_path" value="$(find vision)/../data/object_models" />
+  <rosparam command="load" file="$(find vision)/config/demo_objects.yaml"/>
+
+  <node name="simtrack" pkg="simtrack_nodes" type="multi_rigid_node" output="screen" respawn="true">
+  <remap from="rgb" to="/logitech_camera/image_rect_color" />
+  <remap from="rgb/compressed" to="/logitech_camera/image_rect_color/compressed" />
+  <remap from="rgb_info" to="/logitech_camera/camera_info" />
+  </node>
+
+</launch>
