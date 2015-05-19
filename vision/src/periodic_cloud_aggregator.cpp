@@ -65,15 +65,11 @@ class PeriodicCloudPublisher {
         m_min_aggregated_cloud_time(10.0),
         m_kinect_last_received(chrono::system_clock::now()),
         m_first_dimage_received(false),
-        m_action_server(
-            m_nh, "periodic_cloud_aggregator",
-            boost::bind(&PeriodicCloudPublisher::executeCB, this, _1), false),
         m_action_name("periodic_cloud_aggregator"),
         m_build_aggregated_cloud(false),
         m_bin_cloud(new pcl::PointCloud<pcl::PointXYZ>),
         m_shelf_cloud(new pcl::PointCloud<pcl::PointXYZ>),
-        m_bin_cloud_rgb(new pcl::PointCloud<pcl::PointXYZRGB>)
-  {
+        m_bin_cloud_rgb(new pcl::PointCloud<pcl::PointXYZRGB>) {
 
     m_publisher = m_nh.advertise<sensor_msgs::PointCloud2>("periodic_cloud", 1);
     m_shelf_publisher =
@@ -81,7 +77,7 @@ class PeriodicCloudPublisher {
     m_bin_publisher =
         m_nh.advertise<sensor_msgs::PointCloud2>("periodic_cloud_bin", 1);
     m_bin_rgbd_publisher =
-            m_nh.advertise<sensor_msgs::PointCloud2>("periodic_cloud_bin_rgbd", 1);
+        m_nh.advertise<sensor_msgs::PointCloud2>("periodic_cloud_bin_rgbd", 1);
 
     m_client =
         m_nh.serviceClient<laser_assembler::AssembleScans2>("assemble_scans2");
@@ -91,10 +87,10 @@ class PeriodicCloudPublisher {
         m_nh.subscribe("/amazon_next_task", 10,
                        &PeriodicCloudPublisher::taskmanagerCallback, this);
 
-    //m_kinect_subscriber = m_nh.subscribe<sensor_msgs::Image>(
+    // m_kinect_subscriber = m_nh.subscribe<sensor_msgs::Image>(
     //    "/head_mount_kinect/depth_registered/sw_registered/image_rect_raw", 1,
     //    &PeriodicCloudPublisher::depthCallback, this);
-    //m_camera_info_sub = m_nh.subscribe<sensor_msgs::CameraInfo>(
+    // m_camera_info_sub = m_nh.subscribe<sensor_msgs::CameraInfo>(
     //    "/head_mount_kinect/depth_registered/sw_registered/camera_info", 1,
     //    &PeriodicCloudPublisher::cameraInfoCallback, this);
 
@@ -131,159 +127,92 @@ class PeriodicCloudPublisher {
             "simtrack/update_validation_point_cloud");
     m_pr2_laser_client = m_nh.serviceClient<pr2_msgs::SetLaserTrajCmd>(
         "laser_tilt_controller/set_traj_cmd");
-    // init action server
-    m_action_server.start();
 
     stopTiltScanner();
   }
-  // returns the status to the client (Behavior Tree)
-  void setStatus(int status) {
-    // Set The feedback and result of BT.action
-    m_feedback.status = status;
-    m_result.status = m_feedback.status;
-    // publish the feedback
-    m_action_server.publishFeedback(m_feedback);
-    // setSucceeded means that it has finished the action (it has returned
-    // SUCCESS or FAILURE).
-    m_action_server.setSucceeded(m_result);
 
-    switch (status) {  // Print for convenience
-      case SUCCESS:
-        ROS_INFO("Action %s Succeeded", ros::this_node::getName().c_str());
-        break;
-      case FAILURE:
-        ROS_INFO("Action %s Failed", ros::this_node::getName().c_str());
-        break;
-      default:
-        break;
-    }
-  }
 
   bool serviceCallback(vision::StartAggregator::Request& req,
                        vision::StartAggregator::Response& res) {
 
+    if (req.flag == 0) {
+      ROS_INFO("Start Aggregating");
 
-    if(req.flag == 0)
-    {
-        ROS_INFO("Start Aggregating");
+      startTiltScanner();
 
-        startTiltScanner();
+      m_build_aggregated_cloud = true;
+      m_laser_request_start = ros::Time::now();
 
-        m_build_aggregated_cloud = true;
-        m_laser_request_start = ros::Time::now();
+      ROS_INFO("Aggregating...");
 
-        ROS_INFO("Aggregating...");
-
-        while (!m_aggregated_cloud_ready) {
-          ros::spinOnce();
-          // ROS_INFO("spinngin once");
-          // check that preempt has not been requested by the client
-        }
-
-        auto elapsed = (ros::Time::now() - m_laser_request_start).toSec();
-        stringstream ss;
-        ss << "CB: Cloud built in: " << elapsed << " secs";
-
-        // building the clouds
-        ROS_INFO(ss.str().c_str());
-        sensor_msgs::PointCloud2 bin_msg,rgbd_msg;
-
-        pcl::toROSMsg(*m_bin_cloud, bin_msg);
-        pcl::toROSMsg(*m_bin_cloud_rgb, rgbd_msg);
-
-        // notify segmentation and tracking
-        notifySegmentationWithClouds(bin_msg, rgbd_msg);
-        //notifyTracker(out_msg);
-        m_aggregated_cloud_ready = false;
-        m_build_aggregated_cloud = false;
-        stopTiltScanner();
-
-        res.result = true;
-
-        return true;
-    }
-    else if(req.flag == 1)
-    {
-        // used to tell the segmentation to stop publishing
-        notifySegmentationToStop();
-
-        res.result = true;
-        return true;
-    }
-
-  }
-
-  void executeCB(const vision::BTGoalConstPtr& goal) {
-
-    // publish info to the console for the user
-    /*ROS_INFO("Starting Action");
-    m_build_aggregated_cloud = true;
-    m_laser_request_start = ros::Time::now();
-    startTiltScanner();
-
-    // start executing the action
-    while (!m_aggregated_cloud_ready) {
-      // check that preempt has not been requested by the client
-      if (m_action_server.isPreemptRequested() || !ros::ok()) {
-        ROS_INFO("Action Halted");
-        // set the action state to preempted
-        m_action_server.setPreempted();
-        // success = false;
-        break;
+      while (!m_aggregated_cloud_ready) {
+        ros::spinOnce();
+        // ROS_INFO("spinngin once");
+        // check that preempt has not been requested by the client
       }
+
+      auto elapsed = (ros::Time::now() - m_laser_request_start).toSec();
+      stringstream ss;
+      ss << "CB: Cloud built in: " << elapsed << " secs";
+
+      // building the clouds
+      ROS_INFO(ss.str().c_str());
+      sensor_msgs::PointCloud2 bin_msg, rgbd_msg;
+
+      pcl::toROSMsg(*m_bin_cloud, bin_msg);
+      pcl::toROSMsg(*m_bin_cloud_rgb, rgbd_msg);
+
+      // notify segmentation and tracking
+      auto result = notifySegmentationWithClouds(bin_msg, rgbd_msg, req.obj_pos,
+                                              req.obj_name);
+      // notifyTracker(out_msg);
+      m_aggregated_cloud_ready = false;
+      m_build_aggregated_cloud = false;
+      stopTiltScanner();
+
+      res.result = result;
+
+      return true;
+    } else if (req.flag == 1) {
+      // used to tell the segmentation to stop publishing
+      notifySegmentationToStop();
+
+      res.result = true;
+      return true;
     }
-
-    auto elapsed = (ros::Time::now() - m_laser_request_start).toSec();
-
-    stringstream ss;
-    ss << "CB: Cloud built in: " << elapsed << " secs";
-
-    // building the clouds
-    ROS_INFO(ss.str().c_str());
-    sensor_msgs::PointCloud2 out_msg, shelf_msg, bin_msg, rgbd_msg;
-    pcl::toROSMsg(m_aggregated_cloud, out_msg);
-    pcl::toROSMsg(*m_bin_cloud, bin_msg);
-    pcl::toROSMsg(*m_shelf_cloud, shelf_msg);
-    pcl::toROSMsg(*m_bin_cloud_rgb, rgbd_msg);
-
-    // notify segmentation and tracking
-    notifySegmentationWithClouds(bin_msg, rgbd_msg);
-    notifyTracker(out_msg);
-    m_aggregated_cloud_ready = false;
-    m_build_aggregated_cloud = false;
-    stopTiltScanner();*/
-    // communicate bt the success
-    setStatus(SUCCESS);
   }
 
-  void notifySegmentationWithClouds(sensor_msgs::PointCloud2& cloud,
-                                    sensor_msgs::PointCloud2& kinect) {
+  bool notifySegmentationWithClouds(sensor_msgs::PointCloud2& cloud,
+                                    sensor_msgs::PointCloud2& kinect,
+                                    vector<double>& pos,
+                                    vector<string>& names) {
     vision::ReceiveCloud srv;
     srv.request.cloud = cloud;
     srv.request.rgb_cloud = kinect;
     srv.request.stop_publish = false;
+    srv.request.obj_name = names;
+    srv.request.obj_pos = pos;
 
     // Make the service call
     if (m_segmentation_client.call(srv)) {
-      bool result = srv.response.result;
-      if (result) ROS_INFO("Segmentation node notified to start");
+      return srv.response.result;
     } else {
+      return false;
       ROS_ERROR("Segmentation node not listening");
     }
   }
 
-  void notifySegmentationToStop()
-  {
-      vision::ReceiveCloud srv;
-      srv.request.stop_publish = true;
-      // = cloud;
-      // Make the service call
-      if (m_segmentation_client.call(srv)) {
-        bool result = srv.response.result;
-        if (result) ROS_INFO("Segmentation node notified to stop");
-      } else {
-        ROS_ERROR("Segmentation node not listening");
-      }
+  void notifySegmentationToStop() {
+    vision::ReceiveCloud srv;
+    srv.request.stop_publish = true;
+    // = cloud;
+    // Make the service call
+    if (m_segmentation_client.call(srv)) {
+      bool result = srv.response.result;
+      if (result) ROS_INFO("Segmentation node notified to stop");
+    } else {
+      ROS_ERROR("Segmentation node not listening");
+    }
   }
 
   void notifyTracker(sensor_msgs::PointCloud2& cloud) {
@@ -302,8 +231,9 @@ class PeriodicCloudPublisher {
     tf::StampedTransform transform;
     string target_frame = "base_footprint";
 
-    if(!getTimedTransform(*m_tf_listener, target_frame, dest_frame, 2.0, transform))
-        return false;
+    if (!getTimedTransform(*m_tf_listener, target_frame, dest_frame, 2.0,
+                           transform))
+      return false;
 
     origin = transform.getOrigin();
     return true;
@@ -423,8 +353,8 @@ class PeriodicCloudPublisher {
 
     cv_bridge::CvImageConstPtr cv_ptr;
     try {
-      cv_ptr =
-          cv_bridge::toCvShare(m_last_rgb_msg, sensor_msgs::image_encodings::BGR8);
+      cv_ptr = cv_bridge::toCvShare(m_last_rgb_msg,
+                                    sensor_msgs::image_encodings::BGR8);
     }
     catch (cv_bridge::Exception& e) {
       ROS_ERROR("cv_bridge exception: %s", e.what());
@@ -511,7 +441,8 @@ class PeriodicCloudPublisher {
       m_aggregated_cloud = laser_cloud;
       m_aggregated_cloud += m_kinect_cloud;
 
-      createCloudBin(m_aggregated_cloud.makeShared(), m_kinect_color_cloud.makeShared());
+      createCloudBin(m_aggregated_cloud.makeShared(),
+                     m_kinect_color_cloud.makeShared());
       CreateCloudShelf(m_aggregated_cloud);
 
       m_aggregated_cloud_ready = true;
@@ -744,8 +675,7 @@ class PeriodicCloudPublisher {
   }
 
   void createCloudBin(const pcl::PointCloud<pcl::PointXYZ>::Ptr& d_cloud,
-                      const pcl::PointCloud<pcl::PointXYZRGB>::Ptr& rgb_cloud)
-  {
+                      const pcl::PointCloud<pcl::PointXYZRGB>::Ptr& rgb_cloud) {
     tf::StampedTransform transform;
     string target_frame = "base_footprint";
     m_mutex.lock();
@@ -756,7 +686,8 @@ class PeriodicCloudPublisher {
     m_bin_cloud->clear();
     m_bin_cloud_rgb->clear();
 
-    getTimedTransform(*m_tf_listener, target_frame, dest_frame, 2.0f, transform);
+    getTimedTransform(*m_tf_listener, target_frame, dest_frame, 2.0f,
+                      transform);
     auto origin = transform.getOrigin();
 
     auto size = getBinSize(dest_frame);
@@ -769,16 +700,19 @@ class PeriodicCloudPublisher {
     float max_z = origin.z() + size.z() - 0.04f;
 
     cropCloud(d_cloud, min_x, max_x, min_y, max_y, min_z, max_z, m_bin_cloud);
-    cropCloud(rgb_cloud, min_x, max_x, min_y, max_y, min_z, max_z, m_bin_cloud_rgb);
+    cropCloud(rgb_cloud, min_x, max_x, min_y, max_y, min_z, max_z,
+              m_bin_cloud_rgb);
 
     stringstream ss;
-    ss << "CROP: d: " << d_cloud->points.size() << " " << m_bin_cloud->points.size()
-       << " rgb: " << rgb_cloud->points.size() << " " << m_bin_cloud_rgb->points.size();
+    ss << "CROP: d: " << d_cloud->points.size() << " "
+       << m_bin_cloud->points.size() << " rgb: " << rgb_cloud->points.size()
+       << " " << m_bin_cloud_rgb->points.size();
     ROS_INFO(ss.str().c_str());
   }
 
   // publishers
-  ros::Publisher m_publisher, m_shelf_publisher, m_bin_publisher, m_bin_rgbd_publisher;
+  ros::Publisher m_publisher, m_shelf_publisher, m_bin_publisher,
+      m_bin_rgbd_publisher;
   // service clients
   ros::ServiceClient m_client, m_segmentation_client, m_tracking_client,
       m_pr2_laser_client;
@@ -830,7 +764,6 @@ class PeriodicCloudPublisher {
 
  protected:
   ros::NodeHandle m_nh;
-  actionlib::SimpleActionServer<vision::BTAction> m_action_server;
   std::string m_action_name;
   vision::BTFeedback m_feedback;
   vision::BTResult m_result;
@@ -851,7 +784,7 @@ int main(int argc, char** argv) {
   ros::Rate r(100);
   while (ros::ok()) {
     aggregated_cloud_publisher.publishClouds();
-    //aggregated_cloud_publisher.publishMarkers();
+    // aggregated_cloud_publisher.publishMarkers();
     // aggregated_cloud_publisher.publishShelfMarkers();
     // aggregated_cloud_publisher.publishCurrentBinMarkers();
     ros::spinOnce();

@@ -35,6 +35,7 @@
 #include <../include/objectsegmentation.h>
 #include <../include/utils.h>
 #include <amazon_challenge_bt_actions/BinTrigger.h>
+#include <queue>
 
 using namespace std;
 
@@ -104,7 +105,7 @@ class CloudSegmenter {
       // pcl::copyPointCloud(m_cloud, m_cloud_colour);
       m_segmentation_request = true;
       m_segmentation_ready = false;
-      segmentCloud();
+      auto result = segmentCloud(req.obj_pos, req.obj_name);
 
       m_is_publishing = true;
 
@@ -180,27 +181,50 @@ class CloudSegmenter {
       SegmentPose &pose = m_cluster_pose[i];
       float min_z = pose.centroid.z() - pose.depth / 2.0f;
       float plane_z = transform.getOrigin().z();
-      if (min_z > plane_z + 0.04f) m_is_valid_cluster[i] = SEG_TYPE::HEIGHT;
+      if (min_z > plane_z + 0.6f) m_is_valid_cluster[i] = SEG_TYPE::HEIGHT;
     }
   }
 
-  void segmentCloud() {
+  bool checkBinStatus(int cluster_found, int bin_items, int obj_detected) {
+    if (cluster_found != bin_items)
+      return false;
+    else if (cluster_found - obj_detected > 2)
+      return false;
+    else
+      return true;
+  }
 
-    if (m_cloud.points.size() == 0) return;
+  vector<tf::Vector3> getKnownCentroids(vector<double> &pos,
+                                        vector<string> &name) {
+    vector<tf::Vector3> res;
+    for (int i = 0; i < name.size(); ++i) {
+      res.push_back(tf::Vector3(pos[3 * i], pos[3 * i + 1], pos[3 * i + 2]));
+    }
+
+    return res;
+  }
+
+  void labelClusters() {}
+
+  bool segmentCloud(vector<double> &pos, vector<string> &name) {
+
+    if (m_cloud.points.size() == 0) return false;
 
     amazon_challenge_bt_actions::BinTrigger srv;
 
-    if (m_task_manager_service.call(srv)) {
-      auto res = srv.response.message;
-      stringstream ss;
-      ss << "num items: " <<res.size() << "\n";
-      for(auto s : res)
-          ss << s << "\n";
+    vector<string> bin_items;
 
+    if (m_task_manager_service.call(srv)) {
+      bin_items = srv.response.message;
+      stringstream ss;
+      ss << "num items: " << bin_items.size() << "\n";
+      for (auto s : bin_items) ss << s << "\n";
       ROS_INFO(ss.str().c_str());
     } else {
       ROS_ERROR("Task manager node not listening");
     }
+
+
 
     m_found_clusters.clear();
 
@@ -208,7 +232,7 @@ class CloudSegmenter {
     vector<pcl::PointCloud<pcl::PointXYZ>> clusters;
     ObjectSegmentation os;
     // os.clusterComponentsEuclidean(m_cloud, clusters);
-    os.clusterExpectedComponents(m_bin_items.size(), m_cloud, clusters);
+    os.clusterExpectedComponents(bin_items.size(), m_cloud, clusters);
     m_found_clusters = clusters;
     m_cluster_pose.clear();
     m_is_valid_cluster.clear();
@@ -233,27 +257,27 @@ class CloudSegmenter {
     stringstream ss;
     ss << "SEG: num clusters found: " << m_found_clusters.size();
 
-    auto count = 0;
+    int valid_count = 0;
     for (auto b : m_is_valid_cluster) {
-      if (b == SEG_TYPE::VALID) count++;
+      if (b == SEG_TYPE::VALID) valid_count++;
     }
-    ss << " valid " << count;
-
-    filterClustersbySize();
-
-    count = 0;
-    for (auto b : m_is_valid_cluster) {
-      if (b == SEG_TYPE::VALID) count++;
-    }
-    ss << " size filter " << count;
+    ss << " size filter " << valid_count;
 
     filterClustersByHeight();
 
-    count = 0;
+    valid_count = 0;
     for (auto b : m_is_valid_cluster) {
-      if (b == SEG_TYPE::VALID) count++;
+      if (b == SEG_TYPE::VALID) valid_count++;
     }
-    ss << " height filter " << count;
+    ss << " height filter " << valid_count;
+
+    bool status = checkBinStatus(valid_count, bin_items.size(), name.size());
+    if (!status) {
+      stringstream warn;
+      warn << "Clustering non consistent with objects in the bin";
+      ROS_WARN(warn.str().c_str());
+      return false;
+    }
 
     pcl::PointCloud<pcl::PointXYZRGB> cluster_cloud;
     // pcl::copyPointCloud(m_cloud, m_cloud_colour);
@@ -280,6 +304,32 @@ class CloudSegmenter {
         cluster_cloud += cluster_rgb;
       }
     }
+
+
+    if(pos.size() == 1)
+    {
+        tf::Vector3 know_object = getKnownCentroids(pos, name)[0];
+        string obj_name = name[0];
+        int c_id;
+        double distance = numeric_limits<double>::max();
+        for(int i = 0; i < m_cluster_pose.size(); ++i)
+        {
+            if(m_is_valid_cluster[i] == SEG_TYPE::VALID)
+            {
+                //double dis = know_object.distance2(m_cluster_pose[i]);
+                /*if(dis < distance)
+                {
+                    distance = dis;
+                    c_id = i;
+                }*/
+            }
+        }
+        //m_cluster_labels[]
+
+
+    }
+
+
 
     m_cloud_colour = cluster_cloud;
 
@@ -447,7 +497,7 @@ class CloudSegmenter {
     marker.ns = ns;
     marker.id = id;
     marker.type = shape;
-    marker.action = visualization_msgs::Marker::ADD;
+    marker. = visualization_msgs::Marker::ADD;
 
     marker.pose.position.x = tfinal.x();
     marker.pose.position.y = tfinal.y();
@@ -493,6 +543,7 @@ class CloudSegmenter {
   vector<pcl::PointCloud<pcl::PointXYZ>> m_found_clusters;
   vector<SegmentPose> m_cluster_pose;
   vector<int> m_is_valid_cluster;
+  vector<string> m_cluster_labels;
   atomic_bool m_segmentation_request;
   atomic_bool m_segmentation_ready;
 

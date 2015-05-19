@@ -141,6 +141,7 @@ target_link_libraries(object_segmentation_node
 add_executable(segmentation_test_client
     src/segmentation_test_client.cpp
     src/object_segmentation.cpp
+    src/hungarian.cpp
 )
 
 target_link_libraries(segmentation_test_client
