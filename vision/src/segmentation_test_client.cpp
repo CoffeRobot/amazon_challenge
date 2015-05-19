@@ -226,26 +226,66 @@ class CropTool {
 
 }  // end namespace
 
-std::vector< std::vector<int> > array_to_matrix(int* m, int rows, int cols) {
-  int i,j;
-  std::vector< std::vector<int> > r;
+std::vector<std::vector<int>> array_to_matrix(int* m, int rows, int cols) {
+  int i, j;
+  std::vector<std::vector<int>> r;
   r.resize(rows, std::vector<int>(cols, 0));
 
-  for(i=0;i<rows;i++)
-  {
-    for(j=0;j<cols;j++)
-      r[i][j] = m[i*cols+j];
+  for (i = 0; i < rows; i++) {
+    for (j = 0; j < cols; j++) r[i][j] = m[i * cols + j];
   }
   return r;
 }
 
-
 int main(int argc, char** argv) {
 
+  vector<vector<double>> values;
+  vector<double> v1 = {1, 4, 3};
+  vector<double> v2 = {4, 2, 3};
+  vector<double> v3 = {5,1,2};
+  values.push_back(v1);
+  values.push_back(v2);
+  values.push_back(v3);
+  vector<int> idx(values[0].size(),-1);
 
+  for (auto i = 0; i < values.size(); ++i) {
 
+      auto min_id_j = 0;
+      auto min_id_k = 0;
+      auto min_val = numeric_limits<double>::max();
 
+      for (auto j = 0; j < values.size(); ++j) {
+          for(auto k= 0; k < values[j].size(); ++k)
+          {
+                if(values[j][k] <= min_val)
+                {
+                    min_val = values[j][k];
+                    min_id_j = j;
+                    min_id_k = k;
+                }
+          }
+      }
 
+      cout << "min val: j " << min_id_j << " k " << min_id_k << " " << min_val << std::endl;
+
+      for(auto w = 0; w < values[min_id_j].size(); ++w)
+          values[min_id_j][w] = numeric_limits<float>::max();
+
+      for(auto w = 0; w < values.size(); ++w)
+          values[w][min_id_k] = numeric_limits<float>::max();
+
+      idx[min_id_k] = min_id_j;
+
+      stringstream ss;
+      for(auto v : idx)
+          ss << v << " ";
+      cout << ss.str() << endl;
+  }
+
+  stringstream ss;
+  for(auto v : idx)
+      ss << v << " ";
+  cout << ss.str() << endl;
 
   return 0;
 }

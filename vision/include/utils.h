@@ -16,6 +16,7 @@
 #include <pcl/filters/passthrough.h>
 #include <DepthTraits.h>
 #include <sstream>
+#include <limits>
 
 namespace amazon_challenge {
 
@@ -231,6 +232,48 @@ bool getTimedTransform(const tf::TransformListener& listener,
   ss << "TF: timeout for " << target_frame << " " << dest_frame;
   ROS_ERROR(ss.str().c_str());
   return false;
+}
+
+void findBestMatching(const std::vector<std::vector<double>>& in_values, std::vector<int>& labels)
+{
+    /*vector<vector<double>> values;
+    vector<double> v1 = {1, 4, 3};
+    vector<double> v2 = {4, 2, 3};
+    vector<double> v3 = {5,1,2};
+    values.push_back(v1);
+    values.push_back(v2);
+    values.push_back(v3);*/
+
+    auto values = in_values;
+
+    labels.resize(values[0].size(),-1);
+
+    for (auto i = 0; i < values.size(); ++i) {
+
+        auto min_id_j = 0;
+        auto min_id_k = 0;
+        auto min_val = std::numeric_limits<double>::max();
+
+        for (auto j = 0; j < values.size(); ++j) {
+            for(auto k= 0; k < values[j].size(); ++k)
+            {
+                  if(values[j][k] <= min_val)
+                  {
+                      min_val = values[j][k];
+                      min_id_j = j;
+                      min_id_k = k;
+                  }
+            }
+        }
+
+        for(auto w = 0; w < values[min_id_j].size(); ++w)
+            values[min_id_j][w] = std::numeric_limits<double>::max();
+
+        for(auto w = 0; w < values.size(); ++w)
+            values[w][min_id_k] = std::numeric_limits<double>::max();
+
+        labels[min_id_k] = min_id_j;
+    }
 }
 
 }  // end namespace
