@@ -240,9 +240,9 @@ std::vector<std::vector<int>> array_to_matrix(int* m, int rows, int cols) {
 int main(int argc, char** argv) {
 
   vector<vector<double>> values;
-  vector<double> v1 = {1, 4, 3};
-  vector<double> v2 = {4, 2, 3};
-  vector<double> v3 = {5,1,2};
+  vector<double> v1 = {1};
+  vector<double> v2 = {4};
+  vector<double> v3 = {5};
   values.push_back(v1);
   values.push_back(v2);
   values.push_back(v3);

@@ -230,6 +230,33 @@ class CloudSegmenter {
     }
   }
 
+  void assingBestLabels(const vector<string> &items,
+                        const vector<string> &names, vector<string> &labels) {
+
+      vector<string> labels_left;
+      for (auto i = 0; i < items.size(); ++i) {
+        bool found = false;
+        for (int j = 0; j < names.size(); ++j) {
+          if (names[j].compare(items[i]) == 0) {
+            found = true;
+            break;
+          }
+        }
+        if (!found) labels_left.push_back(items[i]);
+      }
+
+      auto valid_count = 0;
+      for (int i = 0; i < labels.size(); ++i) {
+        if (labels[i].compare("") == 0 &&
+            valid_count < labels_left.size()) {
+          labels[i] = labels_left[valid_count];
+          valid_count++;
+        }
+      }
+
+
+  }
+
   bool segmentCloud(vector<double> &pos, vector<string> &name) {
 
     if (m_cloud.points.size() == 0) return false;
@@ -243,6 +270,10 @@ class CloudSegmenter {
     } else {
       ROS_ERROR("Task manager node not listening");
     }
+
+    stringstream info;
+    info << "known objewcts received: " << name.size() << " pos " << pos.size();
+    ROS_INFO(info.str().c_str());
 
     /* segment the constructed point cloud */
     vector<pcl::PointCloud<pcl::PointXYZ>> clusters;
@@ -284,40 +315,81 @@ class CloudSegmenter {
     }
 
     vector<tf::Vector3> obj_known = getKnownCentroids(pos, name);
-    vector<string> labels(clusters.size(), "");
+    // vector<string> labels(clusters.size(), "");
 
-    for (int j = 0; j < obj_known.size(); ++j) {
-      tf::Vector3 &pos = obj_known[j];
-      double min_dis = numeric_limits<double>::max();
-      int obj_id = 0;
-      string label = "";
-      for (auto i = 0; i < clusters.size(); ++i) {
-        if (cluster_status[i] == SEG_TYPE::VALID) {
-          tf::Vector3 &c_pos = cluster_pose[i].centroid;
-          auto distance =
-              std::sqrt(std::pow(static_cast<double>(pos.x()) - static_cast<double>(c_pos.x()),2) +
-                        std::pow(static_cast<double>(pos.y()) - static_cast<double>(c_pos.y()),2) +
-                        std::pow(static_cast<double>(pos.z()) - static_cast<double>(c_pos.z()),2));
-
-          if (distance < min_dis && labels[i].compare("") == 0) {
-            min_dis = distance;
-            obj_id = i;
-            label = name[j];
-          }
-        }
-      }
-      labels[obj_id] = label;
+    // calculate the best label
+    vector<SegmentPose> valid_poses;
+    for (auto i = 0; i < cluster_pose.size(); ++i) {
+      if (cluster_status[i] == SEG_TYPE::VALID)
+        valid_poses.push_back(cluster_pose[i]);
     }
 
-    assingLabels(cluster_status, bin_items, name, labels);
+    vector<vector<double>> dist_matrix(obj_known.size(),
+                                       vector<double>(valid_poses.size(), 0));
+    for (auto i = 0; i < obj_known.size(); ++i) {
+      tf::Vector3 &pos = obj_known[i];
+
+      for (int j = 0; j < valid_poses.size(); j++) {
+        tf::Vector3 &c_pos = valid_poses[j].centroid;
+        auto distance = std::sqrt(std::pow(static_cast<double>(pos.x()) -
+                                               static_cast<double>(c_pos.x()),
+                                           2) +
+                                  std::pow(static_cast<double>(pos.y()) -
+                                               static_cast<double>(c_pos.y()),
+                                           2) +
+                                  std::pow(static_cast<double>(pos.z()) -
+                                               static_cast<double>(c_pos.z()),
+                                           2));
+        dist_matrix[i][j] = distance;
+      }
+    }
+    vector<int> best_labels;
+    findBestMatching(dist_matrix, best_labels);
+    vector<string> labels(valid_poses.size(), "");
+
+    stringstream ss_labels;
+    ss_labels << "PAIRS:\n";
+    for (int i = 0; i < best_labels.size(); ++i) {
+      if (best_labels[i] != -1) {
+        labels[best_labels[i]] = name[i];
+      }
+      ss_labels << best_labels[i] << " ";
+    }
+    ROS_INFO(ss_labels.str().c_str());
+    /*    for (int j = 0; j < obj_known.size(); ++j) {
+          tf::Vector3 &pos = obj_known[j];
+          double min_dis = numeric_limits<double>::max();
+          int obj_id = 0;
+          string label = "";
+          for (auto i = 0; i < clusters.size(); ++i) {
+            if (cluster_status[i] == SEG_TYPE::VALID) {
+              tf::Vector3 &c_pos = cluster_pose[i].centroid;
+              auto distance =
+                  std::sqrt(std::pow(static_cast<double>(pos.x()) -
+       static_cast<double>(c_pos.x()),2) +
+                            std::pow(static_cast<double>(pos.y()) -
+       static_cast<double>(c_pos.y()),2) +
+                            std::pow(static_cast<double>(pos.z()) -
+       static_cast<double>(c_pos.z()),2));
+
+              if (distance < min_dis && labels[i].compare("") == 0) {
+                min_dis = distance;
+                obj_id = i;
+                label = name[j];
+              }
+            }
+          }
+          labels[obj_id] = label;
+        }
+    */
+    //assingLabels(cluster_status, bin_items, name, labels);
+
+    assingBestLabels(bin_items, name, labels);
 
     stringstream label_str;
-    label_str << "LABELS:";
-    for(auto l : labels)
-        label_str << l << "\n";
+    label_str << "LABELS:\n";
+    for (auto l : labels) label_str << l << "\n";
     ROS_INFO(label_str.str().c_str());
-
-
 
     pcl::PointCloud<pcl::PointXYZRGB> cluster_cloud;
     // pcl::copyPointCloud(m_cloud, m_cloud_colour);
@@ -350,7 +422,7 @@ class CloudSegmenter {
     // assign variables for publishing
     m_cluster_labels = labels;
     m_is_valid_cluster = cluster_status;
-    m_cluster_pose = cluster_pose;
+    m_cluster_pose = valid_poses;
 
     // ROS_INFO(ss.str().c_str());
 
@@ -380,10 +452,12 @@ class CloudSegmenter {
 
     int invalid = 0;
     int valid = 0;
-    for (auto i = 0; i < m_is_valid_cluster.size(); ++i) {
+    for (auto i = 0; i < m_cluster_labels.size(); ++i) {
       stringstream cluster_name;
 
-      if (m_is_valid_cluster[i] == SEG_TYPE::SIZE) {
+      cluster_name << m_cluster_labels[i] << "_scan";
+
+      /*if (m_is_valid_cluster[i] == SEG_TYPE::SIZE) {
         cluster_name << "size" << invalid;
         invalid++;
       } else if (m_is_valid_cluster[i] == SEG_TYPE::HEIGHT) {
@@ -391,7 +465,7 @@ class CloudSegmenter {
         invalid++;
       } else {
         cluster_name << m_cluster_labels[i] << "_scan";
-      }
+      }*/
 
       tf::Vector3 &centroid = m_cluster_pose[i].centroid;
       tf::Quaternion &rotation = m_cluster_pose[i].rotation;
