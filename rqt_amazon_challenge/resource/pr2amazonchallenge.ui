@@ -505,9 +505,9 @@
     <property name="geometry">
      <rect>
       <x>340</x>
-      <y>540</y>
+      <y>520</y>
       <width>421</width>
-      <height>80</height>
+      <height>141</height>
      </rect>
     </property>
     <property name="frameShape">
@@ -566,6 +566,58 @@
      </property>
      <property name="text">
       <string>Bin:</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_10">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>80</y>
+       <width>66</width>
+       <height>17</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>JSON: </string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="json_file_label">
+     <property name="geometry">
+      <rect>
+       <x>70</x>
+       <y>80</y>
+       <width>311</width>
+       <height>17</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>JSON: </string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_11">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>110</y>
+       <width>66</width>
+       <height>17</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Contest:</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="contest_label">
+     <property name="geometry">
+      <rect>
+       <x>80</x>
+       <y>110</y>
+       <width>281</width>
+       <height>17</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>JSON: </string>
      </property>
     </widget>
    </widget>

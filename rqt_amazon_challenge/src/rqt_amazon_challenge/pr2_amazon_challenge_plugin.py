@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 
 #   pr2_amazon_challenge_gui
 #
@@ -200,6 +200,33 @@ class PR2AmazonChallengePlugin(Plugin):
 
 
     def timer_cb(self, event):
+        rp = rospkg.RosPack()
+
+        while not rospy.is_shutdown():
+            try:
+                json_pkg = rospy.get_param('/json_file/package', 'amazon_challenge_bt_actions')
+                json_relative_path = rospy.get_param('/json_file/relative_path', 'src/example_full.json')
+                contest = rospy.get_param('/contest', True)
+                break
+            except:
+                rospy.sleep(random.uniform(0,1))
+                continue
+
+        if contest:
+            json_path = os.getenv('HOME') + '/contest.json'
+        else:
+            json_pkg_path = rp.get_path(json_pkg)
+            json_path = json_pkg_path + '/' + json_relative_path
+
+        if contest:
+            self._widget.contest_label.setText('true')
+
+        else:
+            self._widget.contest_label.setText('!!!!!!!!!!!!FALSE!!!!!!!!')
+
+        self._widget.json_file_label.setText(json_path)
+
+
         if self._got_task:
             self._widget.item_label.setText(self._item)
             self._widget.bin_label.setText(self._bin)
