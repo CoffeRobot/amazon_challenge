@@ -1,6 +1,6 @@
 <launch>
 
-  <node name="logitech_tf" pkg="tf" type="static_transform_publisher" args="0.145895 0.301511 0.40981 2.6700213531583814 -0.009010236020142748 1.72307842204547 torso_lift_link logitech_camera 100" output="screen" >
+  <node name="logitech_tf" pkg="tf" type="static_transform_publisher" args="0.361695 -0.018883 -0.0320612 1.5748062934214189 -0.002730114028614507 1.3399155750611376 torso_lift_link logitech_camera 100" output="screen" >
   </node>
 
 </launch>
