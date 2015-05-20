@@ -152,6 +152,8 @@ class PR2AmazonChallengePlugin(Plugin):
 
         self._widget.start_bt_button.clicked[bool].connect(self._handle_start_bt_button_clicked)
 
+        self._widget.start_shelf_publisher_button.clicked[bool].connect(self._handle_start_shelf_publisher_button_clicked)
+
         self._mode = 'pregrasp'
 
         self._got_task = False
@@ -688,7 +690,7 @@ class PR2AmazonChallengePlugin(Plugin):
         rospy.loginfo('[GUI]: start bt button clicked')
         rospy.loginfo('[GUI]: waiting for /kick_ass service')
         try:
-            rospy.wait_for_service('/kick_ass', 20.0)
+            rospy.wait_for_service('/kick_ass', 10.0)
         except:
             rospy.logerr('[GUI]: timed out waiting for BT service /kick_ass')
             return
@@ -698,5 +700,20 @@ class PR2AmazonChallengePlugin(Plugin):
         rospy.loginfo('[GUI]: BT started!!!')
 
         srv.call()
+
+    def _handle_start_shelf_publisher_button_clicked(self):
+        rospy.loginfo('[GUI]: starting shelf publisher')
+        try:
+            rospy.wait_for_service('/shelf_publisher/start', 10.0)
+        except:
+            rospy.logerr('[GUI]: timed out waiting for start publisher service')
+            return
+
+        srv = rospy.ServiceProxy('/shelf_publisher/start', Empty)
+
+        rospy.loginfo('[GUI]: started shelf publisher!')
+
+        srv.call()
+
 
 
