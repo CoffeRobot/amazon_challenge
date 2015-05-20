@@ -244,8 +244,9 @@ void findBestMatching(const std::vector<std::vector<double>>& in_values, std::ve
     values.push_back(v2);
     values.push_back(v3);*/
 
+    if (in_values.size() == 0)
+        return;
     auto values = in_values;
-
     labels.resize(values[0].size(),-1);
 
     for (auto i = 0; i < values.size(); ++i) {
