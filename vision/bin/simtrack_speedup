@@ -1,0 +1,53 @@
+#!/usr/bin/python
+
+
+import rospy
+from sensor_msgs.msg import Image, CompressedImage
+import sys
+
+
+class SimtrackSpeedup():
+
+    def __init__(self, input_hz, output_hz):
+
+        self._input_hz = input_hz
+        self._output_hz = output_hz
+        self._input_period = 1.0/self._input_hz
+        self._output_period = 1.0/self._output_hz
+        self._n_images = int(self._input_period/self._output_period)
+        self._image_pub = rospy.Publisher('/logitech_camera/image_rect_color_infinity', Image)
+        self._image_compressed_pub = rospy.Publisher('/logitech_camera/image_rect_color_infinity/compressed', CompressedImage)
+        image_sub = rospy.Subscriber('/logitech_camera/image_rect_color', Image, self.image_cb)
+        image_compressed_sub = rospy.Subscriber('/logitech_camera/image_rect_color/compressed', CompressedImage, self.image_compressed_cb)
+        self._image = Image()
+        self._image_compressed = CompressedImage()
+
+
+    def image_cb(self, msg):
+        self._image = msg
+
+    def image_compressed_cb(self, msg):
+        self._image_compressed = msg
+
+
+    def publish(self):
+        r = rospy.Rate(self._output_hz)
+        while not rospy.is_shutdown():
+            self._image.header.stamp = rospy.Time.now()
+            self._image_compressed.header.stamp = rospy.Time.now()
+            self._image_pub.publish(self._image)
+            self._image_compressed_pub.publish(self._image_compressed)
+            r.sleep()
+
+
+
+
+
+
+if __name__=="__main__":
+    rospy.init_node('simtrack_speedup')
+    input_hz = float(sys.argv[1])
+    output_hz = float(sys.argv[2])
+
+    simtrack_speedup = SimtrackSpeedup(input_hz, output_hz)
+    simtrack_speedup.publish()
