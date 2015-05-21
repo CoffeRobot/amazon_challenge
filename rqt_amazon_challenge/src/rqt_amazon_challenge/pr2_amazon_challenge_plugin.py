@@ -49,8 +49,10 @@ from std_srvs.srv import Empty
 from std_msgs.msg import String
 
 from pr2_controllers_msgs.msg import Pr2GripperCommand
+from amazon_challenge_grasping.srv import BaseMove, BaseMoveRequest, BaseMoveResponse
+from std_srvs.srv import Empty, EmptyRequest, EmptyResponse
+from geometry_msgs.msg import PoseStamped
 
-from calibrateBase import baseMove
 
 class PR2AmazonChallengePlugin(Plugin):
 
@@ -112,6 +114,10 @@ class PR2AmazonChallengePlugin(Plugin):
         else:
             self._length_tool = 0.216 + self._tool_size[0]
 
+
+        self._shelf_pose_sub = rospy.Subscriber("/pubShelfSep", PoseStamped, self.get_shelf_pose)
+        self._got_shelf_pose = False
+
         # button click callbacks
         self._widget.l_arm_start_pos_button.clicked[bool].connect(self._handle_l_arm_start_pos_button_clicked)
         self._widget.l_arm_row_1_pos_button.clicked[bool].connect(self._handle_l_arm_row_1_pos_button_clicked)
@@ -160,7 +166,6 @@ class PR2AmazonChallengePlugin(Plugin):
         self._timer = rospy.Timer(rospy.Duration(1.0), self.timer_cb)
         self._task_sub = rospy.Subscriber('/amazon_next_task', String, self.task_cb)
         self.get_moveit()
-        self.get_bm()
 
     @staticmethod
     def add_arguments(parser):
@@ -184,21 +189,23 @@ class PR2AmazonChallengePlugin(Plugin):
                 rospy.sleep(random.uniform(0, 1))
                 pass
 
-    def get_bm(self):
+    def get_bm_srv(self):
         while not rospy.is_shutdown():
             try:
-                base_move_params = rospy.get_param('/base_move')
+                rospy.wait_for_service('/base_move_server/move', 5.0)
+                rospy.wait_for_service('/base_move_server/preempt', 5.0)
                 break
             except:
-                rospy.sleep(random.uniform(0,1))
+                rospy.loginfo('[' + rospy.get_name() + ']: waiting for base move server')
                 continue
 
-        self._bm = baseMove.baseMove(verbose=False)
-        self._bm.setPosTolerance(base_move_params['pos_tolerance'])
-        self._bm.setAngTolerance(base_move_params['ang_tolerance'])
-        self._bm.setLinearGain(base_move_params['linear_gain'])
-        self._bm.setAngularGain(base_move_params['angular_gain'])
-        rospy.sleep(2.0)
+        self._bm_move_srv = rospy.ServiceProxy('/base_move_server/move', BaseMove)
+        self._bm_preempt_srv = rospy.ServiceProxy('/base_move_server/preempt', Empty)
+
+
+    def get_shelf_pose(self, msg):
+        self._shelf_pose = msg
+        self._got_shelf_pose = True
 
 
     def timer_cb(self, event):
@@ -559,9 +566,15 @@ class PR2AmazonChallengePlugin(Plugin):
         rospy.loginfo('Base setpoint: ')
         rospy.loginfo(base_pos_goal)
 
-        self._bm.goAngle(base_pos_goal[5])
-        self._bm.goPosition(base_pos_goal[0:2])
-        self._bm.goAngle(base_pos_goal[5])
+        self.get_bm_srv()
+        self._bm_preempt_srv.call(EmptyRequest())
+
+        req = BaseMoveRequest()
+        req.x = base_pos_goal[0]
+        req.y = base_pos_goal[1]
+        req.theta = base_pos_goal[5]
+
+        res = self._bm_move_srv.call(req)
 
 
     def _handle_base_col_2_pos_button_clicked(self):
@@ -582,9 +595,15 @@ class PR2AmazonChallengePlugin(Plugin):
         rospy.loginfo('Base setpoint: ')
         rospy.loginfo(base_pos_goal)
 
-        self._bm.goAngle(base_pos_goal[5])
-        self._bm.goPosition(base_pos_goal[0:2])
-        self._bm.goAngle(base_pos_goal[5])
+        self.get_bm_srv()
+        self._bm_preempt_srv.call(EmptyRequest())
+
+        req = BaseMoveRequest()
+        req.x = base_pos_goal[0]
+        req.y = base_pos_goal[1]
+        req.theta = base_pos_goal[5]
+
+        res = self._bm_move_srv.call(req)
 
 
     def _handle_base_col_3_pos_button_clicked(self):
@@ -605,22 +624,39 @@ class PR2AmazonChallengePlugin(Plugin):
         rospy.loginfo('Base setpoint: ')
         rospy.loginfo(base_pos_goal)
 
-        self._bm.goAngle(base_pos_goal[5])
-        self._bm.goPosition(base_pos_goal[0:2])
-        self._bm.goAngle(base_pos_goal[5])
+        self.get_bm_srv()
+        self._bm_preempt_srv.call(EmptyRequest())
+
+        req = BaseMoveRequest()
+        req.x = base_pos_goal[0]
+        req.y = base_pos_goal[1]
+        req.theta = base_pos_goal[5]
+
+        res = self._bm_move_srv.call(req)
 
 
     def _handle_base_retreat_button_clicked(self):
         rospy.loginfo('[GUI]: base retreat')
 
-        base_pos_goal = [-1.42, self._bm.trans[1], self._bm.trans[2], 0.0, 0.0, 0.0]
+        r = rospy.Rate(1.0)
+        while not self._got_shelf_pose:
+            rospy.loginfo('[' + rospy.get_name() + ']: waiting for shelf pose')
+            r.sleep()
+
+        base_pos_goal = [-1.42, -self._shelf_pose.pose.position.y, 0.0, 0.0, 0.0, 0.0]
 
         rospy.loginfo('Base setpoint: ')
         rospy.loginfo(base_pos_goal)
 
-        self._bm.goAngle(base_pos_goal[5])
-        self._bm.goPosition(base_pos_goal[0:2])
-        self._bm.goAngle(base_pos_goal[5])
+        self.get_bm_srv()
+        self._bm_preempt_srv.call(EmptyRequest())
+
+        req = BaseMoveRequest()
+        req.x = base_pos_goal[0]
+        req.y = base_pos_goal[1]
+        req.theta = base_pos_goal[5]
+
+        res = self._bm_move_srv.call(req)
 
     def _handle_head_row_1_pos_button_clicked(self):
         rospy.loginfo('[GUI]: head row 1 pos')
