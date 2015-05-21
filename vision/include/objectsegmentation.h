@@ -27,14 +27,17 @@ class ObjectSegmentation {
                  pcl::PointCloud<pcl::PointXYZ>& plane_cloud,
                  pcl::PointCloud<pcl::PointXYZ>& filtered_cloud);
 
+  bool filterCloudByHeight(const pcl::PointCloud<pcl::PointXYZ>& in,
+                           const Eigen::Vector3f& bin_pos);
+
   void clusterComponentsEuclidean(
       pcl::PointCloud<pcl::PointXYZ>& in_cloud,
       std::vector<pcl::PointCloud<pcl::PointXYZ>>& clusters);
 
   void clusterExpectedComponents(
       int expected_clusters, pcl::PointCloud<pcl::PointXYZ>& in_cloud,
+      const Eigen::Vector3f& bin_pos,
       std::vector<pcl::PointCloud<pcl::PointXYZ>>& clusters);
-  
 
   void extractPose(const pcl::PointCloud<pcl::PointXYZ>& cloud,
                    Eigen::Vector4f& centroid, Eigen::Quaternionf& rotation,

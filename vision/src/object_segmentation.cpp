@@ -88,6 +88,20 @@ void ObjectSegmentation::findPlane(
   }
 }
 
+bool ObjectSegmentation::filterCloudByHeight(
+    const pcl::PointCloud<pcl::PointXYZ> &in_cloud,
+    const Eigen::Vector3f &bin_pos) {
+
+  Eigen::Vector4f centroid;
+  Eigen::Quaternionf rotation;
+  float w, h, d;
+  extractPose(in_cloud, centroid, rotation, w, h, d);
+
+  float min_z = centroid.z() - h / 2.0f;
+
+  return min_z > bin_pos.z() + 0.14f;
+}
+
 void ObjectSegmentation::clusterComponentsEuclidean(
     pcl::PointCloud<pcl::PointXYZ> &in_cloud,
     vector<pcl::PointCloud<pcl::PointXYZ>> &clusters) {
@@ -123,6 +137,7 @@ void ObjectSegmentation::clusterComponentsEuclidean(
 
 void ObjectSegmentation::clusterExpectedComponents(
     int expected_clusters, pcl::PointCloud<pcl::PointXYZ> &in_cloud,
+    const Eigen::Vector3f &bin_pos,
     std::vector<pcl::PointCloud<pcl::PointXYZ>> &clusters) {
   pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(
       new pcl::search::KdTree<pcl::PointXYZ>);
@@ -134,9 +149,9 @@ void ObjectSegmentation::clusterExpectedComponents(
   ec.setMinClusterSize(100);
   ec.setMaxClusterSize(25000);
 
-  std::vector<float> distances = {0.005, 0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04};
+  std::vector<float> distances = {0.005, 0.01, 0.015, 0.02,
+                                  0.025, 0.03, 0.035, 0.04};
   int min_num_clusters = numeric_limits<int>::max();
-
 
   stringstream ss;
   for (auto dis : distances) {
@@ -157,8 +172,7 @@ void ObjectSegmentation::clusterExpectedComponents(
         pcl::PointCloud<pcl::PointXYZ> tmp_cloud;
         tmp_cloud.header = in_cloud.header;
 
-        for (auto pit = it->indices.begin();
-             pit != it->indices.end(); ++pit) {
+        for (auto pit = it->indices.begin(); pit != it->indices.end(); ++pit) {
 
           auto pt = in_cloud.points[*pit];
           pcl::PointXYZ p(pt.x, pt.y, pt.z);
@@ -166,7 +180,9 @@ void ObjectSegmentation::clusterExpectedComponents(
           tmp_cloud.push_back(p);
         }
 
-        clusters.push_back(tmp_cloud);
+        //NEW: add the finter inside the clustering procedure
+        if (!filterCloudByHeight(tmp_cloud, bin_pos))
+          clusters.push_back(tmp_cloud);
       }
       min_num_clusters = cluster_indices.size();
     }

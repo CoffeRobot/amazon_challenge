@@ -290,10 +290,24 @@ class CloudSegmenter {
     info << "known objewcts received: " << name.size() << " pos " << pos.size();
     ROS_INFO(info.str().c_str());
 
+
+    //NEW: get the location of the bin
+    tf::StampedTransform transform;
+    string bin_name = "shelf_" + m_bin_name;
+    if (!getTimedTransform(m_tf_listener, "base_footprint", bin_name, 2,
+                           transform)) {
+      ROS_WARN("SEG: tf timeout!");
+      return false;
+    }
+
+    //NEW: calciulating the position of the bin
+    auto origin = transform.getOrigin();
+    Eigen::Vector3f bin_pos(origin.x(), origin.y(), origin.z());
+
     /* segment the constructed point cloud */
     vector<pcl::PointCloud<pcl::PointXYZ>> clusters;
     ObjectSegmentation os;
-    os.clusterExpectedComponents(bin_items.size(), m_cloud, clusters);
+    os.clusterExpectedComponents(bin_items.size(), m_cloud, bin_pos, clusters);
 
     vector<SegmentPose> cluster_pose;
     vector<SEG_TYPE> cluster_status;
@@ -315,7 +329,7 @@ class CloudSegmenter {
       m_segmentation_ready = true;
     }
 
-    filterClustersByHeight(cluster_pose, cluster_status);
+    //filterClustersByHeight(cluster_pose, cluster_status);
 
     ROS_INFO(toString(cluster_status).c_str());
 
