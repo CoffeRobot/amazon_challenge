@@ -192,9 +192,10 @@ class CloudSegmenter {
 
     for (auto i = 0; i < poses.size(); ++i) {
       SegmentPose &pose = poses[i];
-      float min_z = pose.centroid.z() - pose.depth / 2.0f;
+      float min_z = pose.centroid.z() - pose.height / 2.0f;
       float plane_z = transform.getOrigin().z();
-      if (min_z > plane_z + 0.6f) status[i] = SEG_TYPE::HEIGHT;
+      std::cout << "min_z: " << min_z << ", plane_z: " << plane_z << endl; 
+      if (min_z > plane_z + 0.14f) status[i] = SEG_TYPE::HEIGHT;
     }
   }
 
@@ -350,7 +351,7 @@ class CloudSegmenter {
                                            2) +
                                   std::pow(static_cast<double>(pos.y()) -
                                                static_cast<double>(c_pos.y()),
-                                           2) +
+                                           2) * 2 +
                                   std::pow(static_cast<double>(pos.z()) -
                                                static_cast<double>(c_pos.z()),
                                            2));
