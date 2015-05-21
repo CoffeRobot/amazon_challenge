@@ -134,7 +134,7 @@ void ObjectSegmentation::clusterExpectedComponents(
   ec.setMinClusterSize(100);
   ec.setMaxClusterSize(25000);
 
-  std::vector<float> distances = {0.005, 0.01, 0.015, 0.02, 0.025};
+  std::vector<float> distances = {0.005, 0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04};
   int min_num_clusters = numeric_limits<int>::max();
 
 

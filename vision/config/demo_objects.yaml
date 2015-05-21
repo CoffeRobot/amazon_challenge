@@ -1,2 +1,3 @@
 simtrack/model_names:
-- ros_groovy_measureable
+#- ros_groovy_measureable
+- mead_index_cards
