@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>766</width>
-    <height>952</height>
+    <height>892</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -507,7 +507,7 @@
       <x>20</x>
       <y>670</y>
       <width>711</width>
-      <height>181</height>
+      <height>141</height>
      </rect>
     </property>
     <property name="frameShape">
@@ -605,8 +605,8 @@
     <widget class="QLabel" name="label_11">
      <property name="geometry">
       <rect>
-       <x>10</x>
-       <y>150</y>
+       <x>140</x>
+       <y>20</y>
        <width>66</width>
        <height>17</height>
       </rect>
@@ -618,8 +618,8 @@
     <widget class="QLabel" name="contest_label">
      <property name="geometry">
       <rect>
-       <x>80</x>
-       <y>150</y>
+       <x>210</x>
+       <y>20</y>
        <width>601</width>
        <height>17</height>
       </rect>
@@ -658,7 +658,7 @@
      <x>0</x>
      <y>0</y>
      <width>766</width>
-     <height>23</height>
+     <height>25</height>
     </rect>
    </property>
   </widget>
