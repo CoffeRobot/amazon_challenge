@@ -124,32 +124,32 @@ class CropTool {
 
   void getParams() {
     ros::NodeHandle nh = ros::NodeHandle();
-    if (!nh.getParam("/segmentation/front_crop", (double&)m_front_crop)) {
+    if (!nh.getParam("/segmentation/front_crop", m_front_crop)) {
       ROS_WARN("Loading default front_crop segmentation param");
       m_front_crop = 0.03;
     }
 
-    if (!nh.getParam("/segmentation/back_crop", (double&)m_back_crop)) {
+    if (!nh.getParam("/segmentation/back_crop", m_back_crop)) {
       ROS_WARN("Loading default back_crop segmentation param");
       m_back_crop = 0.04;
     }
 
-    if (!nh.getParam("/segmentation/top_crop", (double&)m_top_crop)) {
+    if (!nh.getParam("/segmentation/top_crop", m_top_crop)) {
       ROS_WARN("Loading default top_crop segmentation param");
       m_top_crop = 0.03;
     }
 
-    if (!nh.getParam("/segmentation/bottom_crop", (double&)m_bottom_crop)) {
+    if (!nh.getParam("/segmentation/bottom_crop", m_bottom_crop)) {
       ROS_WARN("Loading default bottom_crop segmentation param");
       m_bottom_crop = 0.01;
     }
 
-    if (!nh.getParam("/segmentation/left_crop", (double&)m_left_crop)) {
+    if (!nh.getParam("/segmentation/left_crop", m_left_crop)) {
       ROS_WARN("Loading default left_crop segmentation param");
       m_left_crop = 0.02;
     }
 
-    if (!nh.getParam("/segmentation/right_crop", (double&)m_right_crop)) {
+    if (!nh.getParam("/segmentation/right_crop", m_right_crop)) {
       ROS_WARN("Loading default right_crop segmentation param");
       m_right_crop = 0.02;
     }
@@ -410,7 +410,7 @@ class CropTool {
     m_shelf_L_pub.publish(l);
   }
 
-  float m_left_crop, m_right_crop, m_bottom_crop, m_top_crop, m_front_crop,
+  double m_left_crop, m_right_crop, m_bottom_crop, m_top_crop, m_front_crop,
       m_back_crop;
 
  private:
