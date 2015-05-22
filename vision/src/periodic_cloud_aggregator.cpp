@@ -134,7 +134,42 @@ class PeriodicCloudPublisher {
     m_pr2_laser_client = m_nh.serviceClient<pr2_msgs::SetLaserTrajCmd>(
         "laser_tilt_controller/set_traj_cmd");
 
+    getParams();
+
     stopTiltScanner();
+  }
+
+  void getParams() {
+    ros::NodeHandle nh = ros::NodeHandle();
+    if (!nh.getParam("/segmentation/front_crop", (double&)m_front_crop)) {
+      ROS_WARN("Loading default front_crop segmentation param");
+      m_front_crop = 0.03;
+    }
+
+    if (!nh.getParam("/segmentation/back_crop", (double&)m_back_crop)) {
+      ROS_WARN("Loading default back_crop segmentation param");
+      m_back_crop = 0.04;
+    }
+
+    if (!nh.getParam("/segmentation/top_crop", (double&)m_top_crop)) {
+      ROS_WARN("Loading default top_crop segmentation param");
+      m_top_crop = 0.03;
+    }
+
+    if (!nh.getParam("/segmentation/bottom_crop", (double&)m_bottom_crop)) {
+      ROS_WARN("Loading default bottom_crop segmentation param");
+      m_bottom_crop = 0.01;
+    }
+
+    if (!nh.getParam("/segmentation/left_crop", (double&)m_left_crop)) {
+      ROS_WARN("Loading default left_crop segmentation param");
+      m_left_crop = 0.02;
+    }
+
+    if (!nh.getParam("/segmentation/right_crop", (double&)m_right_crop)) {
+      ROS_WARN("Loading default right_crop segmentation param");
+      m_right_crop = 0.02;
+    }
   }
 
 
@@ -698,12 +733,12 @@ class PeriodicCloudPublisher {
 
     auto size = getBinSize(dest_frame);
 
-    float min_x = origin.x() + 0.04;
-    float max_x = origin.x() + size.x() - 0.04;
-    float min_y = origin.y() + 0.02;
-    float max_y = origin.y() + size.y() - 0.035;
-    float min_z = origin.z() + 0.01;
-    float max_z = origin.z() + size.z() - 0.05f;
+    float min_x = origin.x() + m_front_crop;
+    float max_x = origin.x() + size.x() - m_back_crop;
+    float min_y = origin.y() + m_right_crop;
+    float max_y = origin.y() + size.y() - m_left_crop;
+    float min_z = origin.z() + m_bottom_crop;
+    float max_z = origin.z() + size.z() - m_top_crop;
 
     cropCloud(d_cloud, min_x, max_x, min_y, max_y, min_z, max_z, m_bin_cloud);
     cropCloud(rgb_cloud, min_x, max_x, min_y, max_y, min_z, max_z,
@@ -767,6 +802,9 @@ class PeriodicCloudPublisher {
   ros::Publisher m_shelf_marker_pub, m_bin_marker_pub;
 
   ros::ServiceServer m_service_server;
+
+  float m_left_crop, m_right_crop, m_bottom_crop, m_top_crop, m_front_crop,
+      m_back_crop;
 
  protected:
   ros::NodeHandle m_nh;

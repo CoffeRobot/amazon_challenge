@@ -1,7 +1,8 @@
 segmentation:
-  front_crop: 0.03
-  back_crop: 0.04
-  top_crop: 0.04
+  front_crop: 0.04
+  back_crop: 0.04  
+  right_crop: 0.02  
+  left_crop: 0.035
   bottom_crop: 0.01
-  left_crop: 0.03
-  right_crop: 0.03
+  top_crop: 0.05
+
